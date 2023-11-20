@@ -182,7 +182,7 @@ class ScaledDotProductAttention(nn.Module):
 
         output = attn @ v
         # output: [ (batch_size * n_heads) x seq_len x hidden_size ]
-        return output
+        return output, attn
 
 
 class MultiHeadAttention(nn.Module):
