@@ -4,6 +4,7 @@ from hw_tts.datasets.librispeech_dataset import LibrispeechDataset
 from hw_tts.datasets.ljspeech_dataset import LJspeechDataset
 from hw_tts.datasets.common_voice import CommonVoiceDataset
 from hw_tts.datasets.mixed_librispeech_dataset import LibrispeechMixedDataset
+from hw_tts.datasets.tts import LJspeechFastSpeech2Dataset
 
 __all__ = [
     "LibrispeechDataset",
@@ -11,5 +12,6 @@ __all__ = [
     "CustomAudioDataset",
     "LJspeechDataset",
     "CommonVoiceDataset",
-    "LibrispeechMixedDataset"
+    "LibrispeechMixedDataset",
+    "LJspeechFastSpeech2Dataset"
 ]
