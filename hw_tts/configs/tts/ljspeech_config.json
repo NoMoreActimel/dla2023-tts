@@ -2,11 +2,22 @@
     "name": "ljspeech_fastspeech2_test",
     "n_gpu": 1,
     "preprocessing": {
-      "sr": 16000,
       "spectrogram": {
         "type": "MelSpectrogram",
         "args": {
         }
+      },
+      "use_pitch_spectrogram": false,
+      "pitch_energy_normalization": true,
+      "sr": 22050,
+      "max_wav_value": 32768.0,
+      "hop_size": 256,
+      "val_size": 0.1,
+      "random_state": 42,
+      "TacotronSTFT": {
+        "filter_length": 1024,
+        "hop_length": 256,
+        "win_length": 1024
       },
       "mfa": {
         "perform": false,
@@ -65,20 +76,6 @@
       "args": {}
     },
     "metrics": [
-      {
-        "type": "SiSDRMetric",
-        "args": {
-          "name": "Si SDR"
-        }
-      },
-      {
-        "type": "PESQMetric",
-        "args": {
-          "name": "PESQ",
-          "fs": 16000,
-          "mode": "wb"
-        }
-      }
     ],
     "lr_scheduler": {
       "type": "CosineAnnealingWarmRestarts",
