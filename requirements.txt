@@ -19,3 +19,7 @@ pypi-kenlm
 pyloudnorm
 torchmetrics
 pesq
+
+pyworld
+tgt
+unidecode

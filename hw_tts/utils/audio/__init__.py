@@ -1,3 +1,3 @@
-import audio.tools
-import audio.stft
-import audio.audio_processing
+from tools import *
+from audio_processing import *
+from stft import *
