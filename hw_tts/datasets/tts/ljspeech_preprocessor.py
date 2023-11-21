@@ -90,17 +90,17 @@ class LJSpeechPreprocessor:
         self.random_state = self.prep_config.get("random_state", None)
 
         # MFA flags
-        self.perform_mfa_alignment = self.prep_config.get(
-            "perform_mfa_alignment", perform_mfa_alignment
+        self.perform_mfa_alignment = self.prep_config["mfa"].get(
+            "perform", perform_mfa_alignment
         )
-        self.download_mfa_alignment = self.prep_config.get(
-            "download_mfa_alignment", download_mfa_alignment
+        self.download_mfa_alignment = self.prep_config["mfa"].get(
+            "download", download_mfa_alignment
         )
-        self.mfa_bin_path = self.prep_config.get(
-            "mfa_bin_path", mfa_bin_path
+        self.mfa_bin_path = self.prep_config["mfa"].get(
+            "bin_path", mfa_bin_path
         )
-        self.mfa_pretrained_model_path = self.prep_config.get(
-            "mfa_pretrained_model_path", mfa_pretrained_model_path
+        self.mfa_pretrained_model_path = self.prep_config["mfa"].get(
+            "pretrained_model_path", mfa_pretrained_model_path
         )
 
         # subdirectories for mel-spectrograms, duration, pitch and energy
