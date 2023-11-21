@@ -7,13 +7,9 @@ import shutil
 from pathlib import Path
 import torchaudio
 
-from curses.ascii import isascii
-from scipy.io import wavfile
 from speechbrain.utils.data_utils import download_file
 from tqdm import tqdm
-from unidecode import unidecode
 
-from text import _clean_text
 from hw_tts.base.base_dataset import BaseDataset
 from hw_tts.utils import ROOT_PATH
 from hw_tts.datasets.tts.ljspeech_preprocessor import LJSpeechPreprocessor

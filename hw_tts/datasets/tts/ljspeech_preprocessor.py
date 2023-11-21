@@ -14,7 +14,6 @@ from scipy.io import wavfile
 from sklearn.model_selection import train_test_split
 from speechbrain.utils.data_utils import download_file
 from tqdm import tqdm
-from unidecode import unidecode
 
 from hw_tts.utils.audio.tools import AudioTools
 from hw_tts.utils.text import _clean_text
