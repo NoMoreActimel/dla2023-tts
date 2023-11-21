@@ -6,17 +6,22 @@ import pyworld
 import pywt
 import tgt
 import torch
+import zipfile
 
 from collections import defaultdict
 from scipy.interpolate import interp1d
 from scipy.io import wavfile
 from sklearn.model_selection import train_test_split
+from speechbrain.utils.data_utils import download_file
 from tqdm import tqdm
 from unidecode import unidecode
 
 from hw_tts.utils.audio.tools import AudioTools
 from hw_tts.utils.text import _clean_text
 
+URL_LINKS = {
+    "mfa_alignments": "https://drive.google.com/file/d/1ukb8o-SnqhXCxq7drI3zye3tZdrGvQDA/view?usp=drive_link", 
+}
 
 class LJSpeechPreprocessor:
     def __init__(
@@ -25,6 +30,7 @@ class LJSpeechPreprocessor:
             data_dir,
             config,
             perform_mfa_alignment=False,
+            download_mfa_alignment=False,
             mfa_bin_path=None,
             mfa_pretrained_model_path=None
     ):
@@ -71,20 +77,31 @@ class LJSpeechPreprocessor:
         self.raw_data_dir = raw_data_dir
         self.data_dir = data_dir
         self.config = config
+        self.prep_config = config["preprocessing"]
 
-        self.use_pitch_spectrogram = config["data_processing"]["use_pitch_spectrogram"]
-        self.pitch_energy_normalization = config["data_processing"]["pitch_energy_normalization"]
+        self.use_pitch_spectrogram = self.prep_config["use_pitch_spectrogram"]
+        self.pitch_energy_normalization = self.prep_config["pitch_energy_normalization"]
 
-        self.max_wav_value = config["data_processing"]["max_wav_value"]
-        self.sample_rate = config["data_processing"]["sr"]
-        self.hop_size = config["data_processing"]["hop_size"]
+        self.max_wav_value = self.prep_config["max_wav_value"]
+        self.sample_rate = self.prep_config["sr"]
+        self.hop_size = self.prep_config["hop_size"]
 
-        self.val_size= config["data_processing"].get("val_size", 0.2)
-        self.random_state = config["data_processing"].get("random_state", None)
+        self.val_size = self.prep_config.get("val_size", 0.2)
+        self.random_state = self.prep_config.get("random_state", None)
 
-        self.perform_mfa_alignment = perform_mfa_alignment
-        self.mfa_bin_path = mfa_bin_path
-        self.mfa_pretrained_model_path = mfa_pretrained_model_path
+        # MFA flags
+        self.perform_mfa_alignment = self.prep_config.get(
+            "perform_mfa_alignment", perform_mfa_alignment
+        )
+        self.download_mfa_alignment = self.prep_config.get(
+            "download_mfa_alignment", download_mfa_alignment
+        )
+        self.mfa_bin_path = self.prep_config.get(
+            "mfa_bin_path", mfa_bin_path
+        )
+        self.mfa_pretrained_model_path = self.prep_config.get(
+            "mfa_pretrained_model_path", mfa_pretrained_model_path
+        )
 
         # subdirectories for mel-spectrograms, duration, pitch and energy
         self.spec_path = self.data_dir / "spectrogram"
@@ -92,12 +109,12 @@ class LJSpeechPreprocessor:
         self.pitch_path = self.data_dir / "pitch"
         self.energy = self.data_dir / "energy"
 
-        assert "TacotronSTFT" in config["data_processing"], \
-            "TacotronSTFT params must be provided in data_processing config"
+        assert "TacotronSTFT" in config["preprocessing"], \
+            "TacotronSTFT params must be provided in preprocessing config"
         
         self.audio_tools = AudioTools(
             max_wav_value=self.max_wav_value,
-            stft_params=config["data_processing"]["TacotronSTFT"]
+            stft_params=config["preprocessing"]["TacotronSTFT"]
         )
     
     def process(self):
@@ -105,7 +122,12 @@ class LJSpeechPreprocessor:
         if self.perform_mfa_alignment:
             self.align_with_mfa()
         else:
-            print("MFA alignment is already performed")
+            if os.path.isfile(self.data_dir / "TextGrid"):
+                print("MFA alignments are already performed")
+            elif self.download_mfa_alignment:
+                self.download_mfa_alignments()
+            else:
+                print(f"No MFA aligments found, check the flags")
 
         n_samples = 0
         n_success_samples = 0
@@ -221,7 +243,6 @@ class LJSpeechPreprocessor:
                 with open(self._data_dir / f'{name}.lab', 'w') as text_file:
                     text_file.write(text)
 
-
     def align_with_mfa(self):
         print("Launching MFA alignment between utterances and phonemes...")
         print(f"Alignments will be written to {self.data_dir}")
@@ -231,7 +252,17 @@ class LJSpeechPreprocessor:
             f"english {self.data_dir}"
         )
         os.system(mfa_command)
+        print("MFA alignments are ready")
+    
+    def download_mfa_alignments(self):
+        zip_alignments_path = self.data_dir / "TextGrid"
+        print(f"Downloading MFA alignments to {zip_alignments_path}...")
+        download_file(URL_LINKS["mfa_alignments"], zip_alignments_path)
 
+        print(f"Unzipping MFA alignments to shared data_dir: {self.data_dir}...")
+        with zipfile.ZipFile(zip_alignments_path, 'r') as zip_ref: 
+            zip_ref.extractall(self.data_dir)
+        print("MFA alignments are ready")
 
     def process_utterance(self, name):
         wav_path = self.raw_data_dir / f"{name}.wav"

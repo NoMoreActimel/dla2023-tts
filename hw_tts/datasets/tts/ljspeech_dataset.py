@@ -24,7 +24,6 @@ URL_LINKS = {
     "dataset": "https://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2", 
 }
 
-
 class LJspeechFastSpeech2Dataset(BaseDataset):
     def __init__(self, config=None, raw_data_dir=None, data_dir=None, *args, **kwargs):
         if config is None:
