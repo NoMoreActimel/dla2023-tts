@@ -21,7 +21,7 @@
       "spectrogram": []
     },
     "arch": {
-      "type": "SpExPlusModel",
+      "type": "FastSpeech2",
       "args": {}
     },
     "data": {
@@ -30,12 +30,11 @@
         "num_workers": 5,
         "datasets": [
           {
-            "type": "LibrispeechMixedDataset",
+            "type": "LJspeechFastSpeech2Dataset",
             "args": {
-              "part": "dev-clean",
-              "max_audio_length": 20.0,
-              "max_text_length": 200,
-              "limit": 10
+              "part": "",
+              "raw_data_dir": "/content/dla2023-tts/data/datasets/ljspeech/raw_data",
+              "data_dir": "/content/dla2023-tts/data/datasets/ljspeech/data"
             }
           }
         ]
@@ -45,12 +44,11 @@
         "num_workers": 5,
         "datasets": [
           {
-            "type": "LibrispeechMixedDataset",
+            "type": "LJspeechFastSpeech2Dataset",
             "args": {
-              "part": "dev-clean",
-              "max_audio_length": 20.0,
-              "max_text_length": 200,
-              "limit": 10
+              "part": "",
+              "raw_data_dir": "/content/dla2023-tts/data/datasets/ljspeech/raw_data",
+              "data_dir": "/content/dla2023-tts/data/datasets/ljspeech/data"
             }
           }
         ]

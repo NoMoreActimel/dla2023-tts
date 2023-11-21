@@ -52,6 +52,8 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
         self.max_wav_value = self.config["preprocessing"]["max_wav_value"]
         self.sample_rate = self.config["preprocessing"]["sr"]
 
+        self._load_dataset()
+
         self.data_processor = LJSpeechPreprocessor(raw_data_dir, data_dir, self.config_parser)
         self.data_processor.process()
     
@@ -59,25 +61,25 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
         super().__init__(index, *args, **kwargs)
 
     def _load_dataset(self):
-        arch_path = self._data_dir / "LJSpeech-1.1.tar.bz2"
+        arch_path = self._raw_data_dir / "LJSpeech-1.1.tar.bz2"
         print(f"Loading LJSpeech")
         download_file(URL_LINKS["dataset"], arch_path)
-        shutil.unpack_archive(arch_path, self._data_dir)
-        for fpath in (self._data_dir / "LJSpeech-1.1").iterdir():
-            shutil.move(str(fpath), str(self._data_dir / fpath.name))
+        shutil.unpack_archive(arch_path, self._raw_data_dir)
+        for fpath in (self._raw_data_dir / "LJSpeech-1.1").iterdir():
+            shutil.move(str(fpath), str(self._raw_data_dir / fpath.name))
         os.remove(str(arch_path))
-        shutil.rmtree(str(self._data_dir / "LJSpeech-1.1"))
+        shutil.rmtree(str(self._raw_data_dir / "LJSpeech-1.1"))
 
-        files = [file_name for file_name in (self._data_dir / "wavs").iterdir()]
-        train_length = int(0.85 * len(files)) # hand split, test ~ 15% 
-        (self._data_dir / "train").mkdir(exist_ok=True, parents=True)
-        (self._data_dir / "test").mkdir(exist_ok=True, parents=True)
-        for i, fpath in enumerate((self._data_dir / "wavs").iterdir()):
-            if i < train_length:
-                shutil.move(str(fpath), str(self._data_dir / "train" / fpath.name))
-            else:
-                shutil.move(str(fpath), str(self._data_dir / "test" / fpath.name))
-        shutil.rmtree(str(self._data_dir / "wavs"))
+        # files = [file_name for file_name in (self._data_dir / "wavs").iterdir()]
+        # train_length = int(0.85 * len(files)) # hand split, test ~ 15% 
+        # (self._data_dir / "train").mkdir(exist_ok=True, parents=True)
+        # (self._data_dir / "test").mkdir(exist_ok=True, parents=True)
+        # for i, fpath in enumerate((self._data_dir / "wavs").iterdir()):
+        #     if i < train_length:
+        #         shutil.move(str(fpath), str(self._data_dir / "train" / fpath.name))
+        #     else:
+        #         shutil.move(str(fpath), str(self._data_dir / "test" / fpath.name))
+        # shutil.rmtree(str(self._data_dir / "wavs"))
 
     def _get_or_load_index(self):
         index_path = self._data_dir / f"index.json"
