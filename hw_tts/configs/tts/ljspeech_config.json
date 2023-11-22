@@ -7,6 +7,8 @@
         "args": {
         }
       },
+      "preprocess_wavs": false,
+      "perform_preprocessing": true,
       "use_pitch_spectrogram": false,
       "pitch_energy_normalization": true,
       "sr": 22050,
@@ -22,9 +24,10 @@
       },
       "mfa": {
         "perform": false,
-        "download": true,
+        "download": false,
         "bin_path": "",
-        "pretrained_model_path": ""
+        "pretrained_model_path": "",
+        "mfa_alignments_path": "content/dla2023-tts/TextGrid"
       },
       "log_spec": true
     },

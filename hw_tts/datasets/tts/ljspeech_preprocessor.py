@@ -9,6 +9,7 @@ import torch
 import zipfile
 
 from collections import defaultdict
+from pathlib import Path
 from scipy.interpolate import interp1d
 from scipy.io import wavfile
 from sklearn.model_selection import train_test_split
@@ -103,6 +104,9 @@ class LJSpeechPreprocessor:
         self.mfa_pretrained_model_path = self.prep_config["mfa"].get(
             "pretrained_model_path", mfa_pretrained_model_path
         )
+        self.mfa_alignments_path = Path(self.prep_config["mfa"].get(
+            "mfa_alignments_path", str(self.data_dir / "textgrid")
+        ))
 
         # subdirectories for mel-spectrograms, duration, pitch and energy
         self.spec_path = self.data_dir / "spectrogram"
@@ -153,7 +157,7 @@ class LJSpeechPreprocessor:
         for i, wav_filename in enumerate(tqdm(os.listdir(self.data_dir))):
             if i == STOP_MAX_ITER:
                 break
-            
+
             if wav_filename[-4:] != ".wav":
                 continue
 
@@ -214,7 +218,7 @@ class LJSpeechPreprocessor:
             pitch_spectrograms = pywt.cwt(pitch, scales, 'mexh')
         
             for pitch_spec in pitch_spectrograms:
-                np.save(self.data_dir / "pitch" / f"{name}_pitch_spec.npy", pitch_spec)
+                np.save(self.pitch_path / f"{name}_pitch_spec.npy", pitch_spec)
 
 
         with open(self.data_dir / "pitch_energy_stats.json", "w") as f:
@@ -261,29 +265,29 @@ class LJSpeechPreprocessor:
 
     def align_with_mfa(self):
         print("Launching MFA alignment between utterances and phonemes...")
-        print(f"Alignments will be written to {self.data_dir}")
+        print(f"Alignments will be written to {self.mfa_alignments_path}")
         mfa_command = (
             f"{self.mfa_bin_path} {self.raw_data_dir} "
             f"{self.mfa_pretrained_model_path} "
-            f"english {self.data_dir}"
+            f"english {self.mfa_alignments_path}"
         )
         os.system(mfa_command)
         print("MFA alignments are ready")
     
     def download_mfa_alignments(self):
-        zip_alignments_path = self.data_dir / "TextGrid.zip"
+        zip_alignments_path = self.raw_data_dir / "TextGrid.zip"
         print(f"Downloading MFA alignments to {zip_alignments_path}...")
         download_file(URL_LINKS["mfa_alignments"], zip_alignments_path)
 
-        print(f"Unzipping MFA alignments to shared data_dir: {self.data_dir}...")
+        print(f"Unzipping MFA alignments to {self.mfa_alignments_path}...")
         with zipfile.ZipFile(zip_alignments_path, 'r') as zip_ref: 
-            zip_ref.extractall(self.data_dir)
+            zip_ref.extractall(self.mfa_alignments_path)
         print("MFA alignments are ready")
 
     def process_utterance(self, name):
         wav_path = self.raw_data_dir / f"{name}.wav"
         text_path = self.raw_data_dir / f"{name}.lab"
-        textgrid_path = self.data_dir / f"{name}.TextGrid"
+        textgrid_path = self.mfa_alignments_path / f"{name}.TextGrid"
         assert textgrid_path.exists(), \
             f"Error loading TextGrid path from MFA for {name}"
     
