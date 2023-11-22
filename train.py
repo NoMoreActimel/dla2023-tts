@@ -37,8 +37,7 @@ def main(config):
     model = config.init_obj(
         config["arch"],
         module_arch,
-        num_speakers=dataloaders["train"].dataset.num_speakers,
-        sample_rate=config["preprocessing"]["sr"]
+        config=config.config
     )
     logger.info(model)
 

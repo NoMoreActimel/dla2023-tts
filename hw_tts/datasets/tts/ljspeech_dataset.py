@@ -24,10 +24,12 @@ URL_LINKS = {
 }
 
 class LJspeechFastSpeech2Dataset(BaseDataset):
-    def __init__(self, config=None, raw_data_dir=None, data_dir=None, *args, **kwargs):
+    def __init__(self, config=None, raw_data_dir=None, data_dir=None, train=True, *args, **kwargs):
         if config is None:
             config = kwargs["config_parser"]
         self.config = config
+
+        self.train = train
 
         if data_dir is None:
             data_dir = config["preprocessing"].get("data_dir", None)
@@ -51,7 +53,7 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
             self._load_dataset()
 
         self.data_processor = LJSpeechPreprocessor(self._raw_data_dir, self._data_dir, self.config)
-        if self.config["preprocessing"].get("perform_preprocessing", None):
+        if self.train and self.config["preprocessing"].get("perform_preprocessing", None):
             self.data_processor.process()
             
         self.spec_dir = self.data_processor.spec_path
@@ -107,38 +109,59 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
     def _create_index(self):
         index = []
 
-        train_metadata = self.data_processor.train_metadata_filename
-        val_metadata = self.data_processor.val_metadata_filename
+        if self.train:
+            metadata_filename = self.data_processor.train_metadata_filename
+        else:
+            metadata_filename = self.data_processor.val_metadata_filename
 
-        for metadata_filename in [train_metadata, val_metadata]:
-            metadata_path = self._data_dir / metadata_filename
-            index = []
-            with open(metadata_path, 'r', encoding='utf-8') as f:
-                for line in f.readlines():
-                    name, text, raw_text = line.strip('\n').split('\t')
-                    index.append({"name": name, "text": text,"raw_text": raw_text})
+        metadata_path = self._data_dir / metadata_filename
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            for line in f.readlines():
+                name, text, raw_text = line.strip('\n').split('\t')
+                index.append({"name": name, "text": text,"raw_text": raw_text})
         
         return index
     
     @classmethod
-    def collate_fn(dataset_items):
-        stats = {
+    def collate_fn(batch_items):
+        batch = {
             "name": [], "raw_text": [], "text": [], "text_length": [],
             "spectrogram": [], "spectrogram_length": [],
             "duration": [], "pitch": [], "energy": []
         }
+        # src_seq,
+        # src_pos,
+        # mel_pos,
+        # max_mel_length,
+        # duration_target=None,
+        # pitch_target=None,
+        # energy_target=None,
 
-        for item in dataset_items:
-            for key in stats.keys():
-                if key in ["text_length", "spectrogram_length"]:
-                    stats[key].append(item[key.split('_')[0]].shape[0])
-                else:
-                    stats[key].append(item[key])
-        
-        for key, values in stats.items():
-            if key in ["text", "spectrogram", "duration", "pitch", "energy"]:
-                stats[key] = pad_sequence(values, batch_first=True)
-        
-        return stats
+        batch = {}
+        batch["src_seq"] = [item["text"] for item in batch_items]
+        batch_items["mel_target"] = [item["spectrogram"] for item in batch_items]
+        batch["duration_target"] = [item["duration"] for item in batch_items]
+        batch["pitch_target"] = [item["pitch"] for item in batch_items]
+        batch["energy_target"] = [item["energy"] for item in batch_items]
 
+        for key in ["src_seq", "mel_target", "duration_target", "pitch_target", "energy_target"]:
+            batch[key] = pad_sequence(batch[key], batch_first=True)
 
+        text_lengths = [item["text"].shape[0] for item in batch_items]
+        mel_lengths = [item["spectrogram"].shape[0] for item in batch_items]
+
+        src_pos = list()
+        max_len = int(max(text_lengths))
+        for length_src_row in text_lengths:
+            src_pos.append(np.pad([i+1 for i in range(int(length_src_row))],
+                                (0, max_len-int(length_src_row)), 'constant'))
+        batch["src_pos"] = torch.from_numpy(np.array(src_pos))
+
+        mel_pos = list()
+        batch["max_mel_length"] = int(max(mel_lengths))
+        for length_mel_row in mel_lengths:
+            mel_pos.append(np.pad([i+1 for i in range(int(length_mel_row))],
+                                (0, batch["max_mel_length"]-int(length_mel_row)), 'constant'))
+        batch["mel_pos"] = torch.from_numpy(np.array(mel_pos))
+                
+        return batch

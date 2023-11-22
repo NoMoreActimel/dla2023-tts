@@ -8,7 +8,6 @@ import tgt
 import torch
 import zipfile
 
-from collections import defaultdict
 from pathlib import Path
 from scipy.interpolate import interp1d
 from scipy.io import wavfile
@@ -154,7 +153,7 @@ class LJSpeechPreprocessor:
 
         STOP_MAX_ITER = 100
 
-        for i, wav_filename in enumerate(tqdm(os.listdir(self.data_dir))):
+        for i, wav_filename in enumerate(tqdm(os.listdir(self.raw_data_dir))):
             if i == STOP_MAX_ITER:
                 break
 
@@ -173,23 +172,29 @@ class LJSpeechPreprocessor:
             pitches.append(pitch)
             energies.append(energy)
 
-        stats = defaultdict(dict)
+        stats = {"pitch": {}, "energy": {}}
 
         # normalize and quantize pitches and energies
         # pitch log scaling is already applied in self.get_pitch_f0
         pitches = [np.array(pitch) for pitch in pitches]
-        stats["pitch"]["mean"] = np.mean([np.mean(pitch) for pitch in pitches])
-        stats["pitch"]["std"] = np.mean([np.std(pitch) for pitch in pitches])
-        stats["pitch"]["min"] = np.min([np.min(pitch) for pitch in pitches])
-        stats["pitch"]["max"] = np.max([np.max(pitch) for pitch in pitches])
-        pitches = (pitches - stats["pitch"]["mean"]) / stats["pitch"]["std"]
+        stats["pitch"]["mean"] = float(np.mean([np.mean(pitch) for pitch in pitches]))
+        stats["pitch"]["std"] = float(np.mean([np.std(pitch) for pitch in pitches]))
+        stats["pitch"]["min"] = float(np.min([np.min(pitch) for pitch in pitches]))
+        stats["pitch"]["max"] = float(np.max([np.max(pitch) for pitch in pitches]))
+        pitches = [
+            (pitch - stats["pitch"]["mean"]) / stats["pitch"]["std"]
+            for pitch in pitches
+        ]
 
         energies = np.concatenate(energies, axis=1)
-        stats["energy"]["mean"] = np.mean([np.mean(energy) for energy in energies])
-        stats["energy"]["std"] = np.mean([np.std(energy) for energy in energies])
-        stats["energy"]["min"] = np.min([np.min(energy) for energy in energies])
-        stats["energy"]["max"] = np.max([np.max(energy) for energy in energies])
-        energies = (energies - stats["energy"]["mean"]) / stats["energy"]["std"] 
+        stats["energy"]["mean"] = float(np.mean([np.mean(energy) for energy in energies]))
+        stats["energy"]["std"] = float(np.mean([np.std(energy) for energy in energies]))
+        stats["energy"]["min"] = float(np.min([np.min(energy) for energy in energies]))
+        stats["energy"]["max"] = float(np.max([np.max(energy) for energy in energies]))
+        energies = [
+            (energy - stats["energy"]["mean"]) / stats["energy"]["std"]
+            for energy in energies
+        ]
 
         """
         We will apply Continuous Wavelet Transform to normalized f0 contours,
@@ -222,7 +227,7 @@ class LJSpeechPreprocessor:
 
 
         with open(self.data_dir / "pitch_energy_stats.json", "w") as f:
-            f.write(json.dumps({stats}))
+            f.write(json.dumps(stats))
 
         for pitch in pitches:
             np.save(self.pitch_path / f"{name}_pitch.npy", pitch)
@@ -289,7 +294,7 @@ class LJSpeechPreprocessor:
         text_path = self.raw_data_dir / f"{name}.lab"
         textgrid_path = self.mfa_alignments_path / f"{name}.TextGrid"
         assert textgrid_path.exists(), \
-            f"Error loading TextGrid path from MFA for {name}"
+            f"Error loading TextGrid path from MFA for {name}, path: {textgrid_path}"
     
         phones, durations, start, end = self.get_alignment(textgrid_path)
         total_duration = sum(durations)
