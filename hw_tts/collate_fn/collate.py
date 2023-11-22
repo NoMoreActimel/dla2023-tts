@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def collate_fn(dataset_items: List[dict]):
+    raise NotImplementedError()
     """
     Collate and pad fields in mixed dataset items
     """

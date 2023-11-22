@@ -14,10 +14,11 @@
       "hop_size": 256,
       "val_size": 0.1,
       "random_state": 42,
-      "TacotronSTFT": {
+      "STFT": {
         "filter_length": 1024,
         "hop_length": 256,
-        "win_length": 1024
+        "win_length": 1024,
+        "sampling_rate": 22050
       },
       "mfa": {
         "perform": false,

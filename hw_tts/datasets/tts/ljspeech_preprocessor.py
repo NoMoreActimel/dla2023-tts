@@ -78,6 +78,8 @@ class LJSpeechPreprocessor:
         self.config = config
         self.prep_config = config["preprocessing"]
 
+        self.preprocess_wavs = self.prep_config["preprocess_wavs"]
+
         self.use_pitch_spectrogram = self.prep_config["use_pitch_spectrogram"]
         self.pitch_energy_normalization = self.prep_config["pitch_energy_normalization"]
 
@@ -104,29 +106,37 @@ class LJSpeechPreprocessor:
 
         # subdirectories for mel-spectrograms, duration, pitch and energy
         self.spec_path = self.data_dir / "spectrogram"
-        self.duration = self.data_dir / "duration"
+        self.spec_path.mkdir(exist_ok=True, parents=True)
+        self.duration_path = self.data_dir / "duration"
+        self.duration_path.mkdir(exist_ok=True, parents=True)
         self.pitch_path = self.data_dir / "pitch"
-        self.energy = self.data_dir / "energy"
+        self.pitch_path.mkdir(exist_ok=True, parents=True)
+        self.energy_path = self.data_dir / "energy"
+        self.energy_path.mkdir(exist_ok=True, parents=True)
 
-        assert "TacotronSTFT" in config["preprocessing"], \
-            "TacotronSTFT params must be provided in preprocessing config"
+        self.train_metadata_filename = "train.txt"
+        self.val_metadata_filename = "val.txt"
+
+        assert "STFT" in config["preprocessing"], \
+            "STFT params must be provided in preprocessing config"
         
         self.audio_tools = AudioTools(
             max_wav_value=self.max_wav_value,
-            stft_params=config["preprocessing"]["TacotronSTFT"]
+            stft_params=config["preprocessing"]["STFT"]
         )
     
     def process(self):
-        self.preprocess_wavs_and_texts()
+        if self.preprocess_wavs:
+            self.preprocess_wavs_and_texts()
+        else:
+            print("Wavs and texts already preprocessed")
+
         if self.perform_mfa_alignment:
             self.align_with_mfa()
+        elif self.download_mfa_alignment:
+            self.download_mfa_alignments()
         else:
-            if os.path.isfile(self.data_dir / "TextGrid"):
-                print("MFA alignments are already performed")
-            elif self.download_mfa_alignment:
-                self.download_mfa_alignments()
-            else:
-                print(f"No MFA aligments found, check the flags")
+            print("MFA alignments are already performed")
 
         n_samples = 0
         n_success_samples = 0
@@ -136,11 +146,18 @@ class LJSpeechPreprocessor:
         pitches = []
         energies = []
 
-        for wav_filename in enumerate(tqdm(os.listdir(self.data_dir))):            
-            name, file_format = wav_filename.split('.')[0]
-            if file_format != "wav":
-                continue
+        print("Processing wavs and texts to get pitch and energy...")
+
+        STOP_MAX_ITER = 100
+
+        for i, wav_filename in enumerate(tqdm(os.listdir(self.data_dir))):
+            if i == STOP_MAX_ITER:
+                break
             
+            if wav_filename[-4:] != ".wav":
+                continue
+
+            name = wav_filename.split('.')[0]
             text, raw_text, pitch, energy = self.process_utterance(name)
 
             n_samples += 1
@@ -148,7 +165,7 @@ class LJSpeechPreprocessor:
                 continue
             n_success_samples += 1
 
-            text_data.append("\t".join(name, text, raw_text))
+            text_data.append("\t".join([name, text, raw_text]))
             pitches.append(pitch)
             energies.append(energy)
 
@@ -156,18 +173,18 @@ class LJSpeechPreprocessor:
 
         # normalize and quantize pitches and energies
         # pitch log scaling is already applied in self.get_pitch_f0
-        pitches = np.concatenate(pitches, axis=0)
-        stats["pitch"]["mean"] = pitches.mean(axis=1)
-        stats["pitch"]["std"] = pitches.std(axis=1)
-        stats["pitch"]["min"] = pitches.min(axis=1)
-        stats["pitch"]["max"] = pitches.max(axis=1)
+        pitches = [np.array(pitch) for pitch in pitches]
+        stats["pitch"]["mean"] = np.mean([np.mean(pitch) for pitch in pitches])
+        stats["pitch"]["std"] = np.mean([np.std(pitch) for pitch in pitches])
+        stats["pitch"]["min"] = np.min([np.min(pitch) for pitch in pitches])
+        stats["pitch"]["max"] = np.max([np.max(pitch) for pitch in pitches])
         pitches = (pitches - stats["pitch"]["mean"]) / stats["pitch"]["std"]
 
         energies = np.concatenate(energies, axis=1)
-        stats["energy"]["mean"] = energies.mean(axis=1)
-        stats["energy"]["std"] = energies.std(axis=1)
-        stats["energy"]["min"] = energies.min(axis=1)
-        stats["energy"]["max"] = energies.max(axis=1)
+        stats["energy"]["mean"] = np.mean([np.mean(energy) for energy in energies])
+        stats["energy"]["std"] = np.mean([np.std(energy) for energy in energies])
+        stats["energy"]["min"] = np.min([np.min(energy) for energy in energies])
+        stats["energy"]["max"] = np.max([np.max(energy) for energy in energies])
         energies = (energies - stats["energy"]["mean"]) / stats["energy"]["std"] 
 
         """
@@ -197,49 +214,49 @@ class LJSpeechPreprocessor:
             pitch_spectrograms = pywt.cwt(pitch, scales, 'mexh')
         
             for pitch_spec in pitch_spectrograms:
-                np.save(self.out_dir / "pitch" / f"{name}_pitch_spec.npy", pitch_spec)
+                np.save(self.data_dir / "pitch" / f"{name}_pitch_spec.npy", pitch_spec)
 
 
         with open(self.data_dir / "pitch_energy_stats.json", "w") as f:
             f.write(json.dumps({stats}))
 
         for pitch in pitches:
-            np.save(self.out_dir / "pitch" / f"{name}_pitch.npy", pitch)
+            np.save(self.pitch_path / f"{name}_pitch.npy", pitch)
         for energy in energies:
-            np.save(self.out_dir / "energy" / f"{name}_energy.npy", energy)
+            np.save(self.energy_path / f"{name}_energy.npy", energy)
         
         train_data, val_data = train_test_split(
             text_data, test_size=self.val_size,
             random_state=self.random_state
         )
 
-        self.write_metadata(train_data, filename="train.json")
-        self.write_metadata(val_data, filename="val.json")
+        self.write_metadata(train_data, filename=self.train_metadata_filename)
+        self.write_metadata(val_data, filename=self.val_metadata_filename)
 
     def preprocess_wavs_and_texts(self):
         print(f'Processing wav and text data...')
-        with open(self._raw_data_dir / 'metadata.csv', encoding='utf-8') as f:
+        with open(self.raw_data_dir / 'metadata.csv', encoding='utf-8') as f:
             for index, line in enumerate(f.readlines()):
-                if (index + 1) % 100 == 0:
-                    print("{:d} Done".format(index))
+                if (index + 1) % 1000 == 0:
+                    print(f"{index+1} Done")
                 
                 parts = line.strip().split('|')
                 name, text = parts[0], parts[2]
 
-                wav_path = self._raw_data_dir / 'wavs' / f'{name}.wav'
+                wav_path = self.raw_data_dir / 'wavs' / f'{name}.wav'
                 assert wav_path.exists(), \
                     "Error during wav and text processing: {wav_path} does not exist"
 
-                wav, _ = librosa.load(wav_path, self.sample_rate)
+                wav, _ = librosa.load(wav_path, sr=self.sample_rate)
                 wav *= np.abs(wav).max() / self.max_wav_value
                 wavfile.write(
-                    self._data_dir / f'{name}.wav',
+                    self.raw_data_dir / f'{name}.wav',
                     self.sample_rate,
-                    wav.astype(np.int16)
+                    wav
                 )
 
                 text = _clean_text(text, cleaner_names=["english_cleaners"])
-                with open(self._data_dir / f'{name}.lab', 'w') as text_file:
+                with open(self.raw_data_dir / f'{name}.lab', 'w') as text_file:
                     text_file.write(text)
 
     def align_with_mfa(self):
@@ -254,7 +271,7 @@ class LJSpeechPreprocessor:
         print("MFA alignments are ready")
     
     def download_mfa_alignments(self):
-        zip_alignments_path = self.data_dir / "TextGrid"
+        zip_alignments_path = self.data_dir / "TextGrid.zip"
         print(f"Downloading MFA alignments to {zip_alignments_path}...")
         download_file(URL_LINKS["mfa_alignments"], zip_alignments_path)
 
@@ -279,7 +296,7 @@ class LJSpeechPreprocessor:
             raw_text = text_file.readline().strip("\n")
         text = "{%s}" % " ".join(phones)
 
-        wav, _ = librosa.load(wav_path)
+        wav, _ = librosa.load(wav_path, sr=self.sample_rate)
         wav_start = int(self.sample_rate * start)
         wav_end = int(self.sample_rate * end)
         wav = wav[wav_start:wav_end]
@@ -289,14 +306,14 @@ class LJSpeechPreprocessor:
         if np.sum(pitch_f0 != 0) <= 1:
             return None, None, None, None
 
-        mel_spectrogram, magnitudes = self.audio_tools.get_mel_from_wav(wav)
+        mel_spectrogram, magnitudes = self.audio_tools.get_mel_from_wav(torch.FloatTensor(wav))
         mel_spectrogram = mel_spectrogram[:, :total_duration]
 
         energy = torch.norm(magnitudes, dim=1)
         energy = energy[:total_duration]
 
-        np.save(self.out_dir / "duration" / f"{name}_duration.npy", durations)
-        np.save(self.out_dir / "spec" / f"{name}_spec.npy", mel_spectrogram.T)
+        np.save(self.duration_path / f"{name}_duration.npy", durations)
+        np.save(self.spec_path / f"{name}_spec.npy", mel_spectrogram.T)
 
         return text, raw_text, pitch_f0, energy
 
