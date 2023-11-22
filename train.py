@@ -34,11 +34,7 @@ def main(config):
     dataloaders = get_dataloaders(config)
 
     # build model architecture, then print to console
-    model = config.init_obj(
-        config["model"],
-        module_arch,
-        config=config.config
-    )
+    model = module_arch.FastSpeech2(config.config)
     logger.info(model)
 
     # prepare for (multi-device) GPU training

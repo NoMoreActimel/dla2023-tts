@@ -42,7 +42,9 @@
         "data_dir": "/content/dla2023-tts/data/datasets/ljspeech/data",
         "variance_adaptor": {
           "num_bins": 256,
-          "quantization_log_scaling": true
+          "quantization_log_scaling": true,
+          "pitch_quantization": true,
+          "energy_quantization": true
         },
         "encoder_decoder": {
           "max_seq_len": 1000,
@@ -66,7 +68,7 @@
           "kernel_size": 3,
           "dropout": 0.1
         },
-        "n_mel_channels": 80 
+        "n_mel_channels": 80
       }
     },
     "data": {

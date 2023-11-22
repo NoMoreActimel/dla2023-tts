@@ -29,23 +29,23 @@ class VarianceAdaptor(nn.Module):
             self.pitch_stats = pitch_energy_stats["pitch"]
             self.energy_stats = pitch_energy_stats["energy"]
         
-        self.num_bins = model_config["variance_adaptor"]["num_bins"]
-        self.quantization_log_scaling = \
-            model_config["variance_adaptor"]["quantization_log_scaling"]
+        self.adaptor_config = model_config["variance_adaptor"]
+        self.num_bins = self.adaptor_config["num_bins"]
+        self.quantization_log_scaling = self.adaptor_config["quantization_log_scaling"]
         
         for feature in ["pitch", "energy"]:
             setattr(
                 self, f"{feature}_embedding",
-                nn.Embedding(self.num_bins, model_config["encoder_dim"])
+                nn.Embedding(self.num_bins, model_config["encoder_decoder"]["encoder_dim"])
             )
 
             setattr(
                 self, f"{feature}_quantization",
-                model_config[f"{feature}_quantization"]
+                self.adaptor_config[f"{feature}_quantization"]
             )
 
-            feature_min = getattr(self, f"{feature}_stats")["min"]
-            feature_max = getattr(self, f"{feature}_stats")["max"]
+            feature_min = torch.tensor(getattr(self, f"{feature}_stats")["min"])
+            feature_max = torch.tensor(getattr(self, f"{feature}_stats")["max"])
 
             if self.quantization_log_scaling:
                 feature_scale = torch.exp(torch.linspace(

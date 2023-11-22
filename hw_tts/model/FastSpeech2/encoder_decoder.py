@@ -41,12 +41,13 @@ class Encoder(nn.Module):
         )
 
         self.layer_stack = nn.ModuleList([FFTBlock(
+            model_config=model_config,
             d_model=model_config["encoder_dim"],
             d_inner=model_config["encoder_conv1d_filter_size"],
             n_head=model_config["encoder_head"],
             d_k=model_config["encoder_dim"] // model_config["encoder_head"],
             d_v=model_config["encoder_dim"] // model_config["encoder_head"],
-            dropout=model_config["dropout"]
+            dropout=model_config["encoder_dropout"]
         ) for _ in range(n_layers)])
 
     def forward(self, src_seq, src_pos, return_attns=False):
@@ -95,12 +96,13 @@ class Decoder(nn.Module):
         )
 
         self.layer_stack = nn.ModuleList([FFTBlock(
+            model_config=model_config,
             d_model=model_config["decoder_dim"],
             d_inner=model_config["decoder_conv1d_filter_size"],
             n_head=model_config["decoder_head"],
             d_k=model_config["decoder_dim"] // model_config["decoder_head"],
             d_v=model_config["decoder_dim"] // model_config["decoder_head"],
-            dropout=model_config["dropout"]
+            dropout=model_config["decoder_dropout"]
         ) for _ in range(n_layers)])
 
     def forward(self, enc_seq, enc_pos, return_attns=False):
@@ -135,6 +137,7 @@ class FFTBlock(torch.nn.Module):
     """FFT Block"""
 
     def __init__(self,
+                 model_config,
                  d_model,
                  d_inner,
                  n_head,
@@ -145,7 +148,7 @@ class FFTBlock(torch.nn.Module):
         self.slf_attn = MultiHeadAttention(
             n_head, d_model, d_k, d_v, dropout=dropout)
         self.pos_ffn = PositionwiseFeedForward(
-            d_model, d_inner, dropout=dropout)
+            model_config, d_model, d_inner, dropout=dropout)
 
     def forward(self, enc_input, non_pad_mask=None, slf_attn_mask=None):
         enc_output, enc_slf_attn = self.slf_attn(

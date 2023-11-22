@@ -144,6 +144,7 @@ class LJSpeechPreprocessor:
         n_samples = 0
         n_success_samples = 0
 
+        names = []
         text_data = []
 
         pitches = []
@@ -168,6 +169,7 @@ class LJSpeechPreprocessor:
                 continue
             n_success_samples += 1
 
+            names.append(name)
             text_data.append("\t".join([name, text, raw_text]))
             pitches.append(pitch)
             energies.append(energy)
@@ -229,9 +231,9 @@ class LJSpeechPreprocessor:
         with open(self.data_dir / "pitch_energy_stats.json", "w") as f:
             f.write(json.dumps(stats))
 
-        for pitch in pitches:
+        for name, pitch in zip(names, pitches):
             np.save(self.pitch_path / f"{name}_pitch.npy", pitch)
-        for energy in energies:
+        for name, energy in zip(name, energies):
             np.save(self.energy_path / f"{name}_energy.npy", energy)
         
         train_data, val_data = train_test_split(
@@ -323,6 +325,8 @@ class LJSpeechPreprocessor:
 
         np.save(self.duration_path / f"{name}_duration.npy", durations)
         np.save(self.spec_path / f"{name}_spec.npy", mel_spectrogram.T)
+        # np.save(self.pitch_path / f"{name}_pitch.npy", pitch_f0)
+        # np.save(self.energy_path / f"{name}_energy.npy", energy)
 
         return text, raw_text, pitch_f0, energy
 
