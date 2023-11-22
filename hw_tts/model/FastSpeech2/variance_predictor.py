@@ -10,11 +10,12 @@ class VariancePredictor(nn.Module):
     def __init__(self, model_config):
         super().__init__()
 
-        self.input_size = model_config["encoder_dim"]
-        self.filter_size = model_config["duration_predictor_filter_size"]
-        self.kernel = model_config["duration_predictor_kernel_size"]
-        self.conv_output_size = model_config["duration_predictor_filter_size"]
-        self.dropout = model_config["dropout"]
+        self.input_size = model_config["encoder_decoder"]["encoder_dim"]
+        predictor_config = model_config["variance_predictor"]
+        self.filter_size = predictor_config["filter_size"]
+        self.kernel = predictor_config["kernel_size"]
+        self.conv_output_size = predictor_config["filter_size"]
+        self.dropout = predictor_config["dropout"]
 
         self.conv_net = nn.Sequential(
             Transpose(-1, -2),

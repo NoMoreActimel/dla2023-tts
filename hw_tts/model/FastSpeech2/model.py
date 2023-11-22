@@ -19,16 +19,18 @@ class FastSpeech2(nn.Module):
         """
         super().__init__()
 
-
-        self.model_config = config["model"]
-        self.preprocessing_config = config["data_preprocessing"]
+        self.model_config = config["model"]["args"]
+        self.preprocessing_config = config["preprocessing"]
         
-        self.encoder = Encoder(self.model_config)
+        self.encoder = Encoder(self.model_config["encoder_decoder"])
+        self.decoder = Decoder(self.model_config["encoder_decoder"])
 
-        max_decoder_len = self.model_config.get("max_mel_length", None)
-        self.decoder = Decoder(self.model_config, len_max_seq=max_decoder_len)
+        self.variance_adaptor = VarianceAdaptor(self.model_config)
 
-        self.variance_adaptor = VarianceAdaptor(config=config, model_config=self.model_config)
+        self.mel_decoder = nn.Linear(
+            self.model_config["encoder_decoder"]["decoder_dim"],
+            self.model_config["n_mel_channels"]
+        )
 
     def forward(
             self,
@@ -63,7 +65,7 @@ class FastSpeech2(nn.Module):
         mel_mask = mel_mask.expand(-1, -1, output.shape[2])
         output = output.masked_fill(mel_mask, 0.0)
 
-        output = self.mel_linear(output)
+        output = self.mel_decoder(output)
 
         return {
             "mel-spectrogram": output,

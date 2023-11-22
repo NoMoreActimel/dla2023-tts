@@ -11,7 +11,7 @@ from hw_tts.utils import ROOT_PATH
 
 
 class VarianceAdaptor(nn.Module):
-    def __init__(self, config, model_config):
+    def __init__(self, model_config):
         super().__init__()
 
         self.model_config = model_config
@@ -22,19 +22,16 @@ class VarianceAdaptor(nn.Module):
 
         self.length_regulator = LengthRegulator()
 
-        data_dir = config["preprocessing"].get("data_dir", None)
-        if data_dir is None:
-            data_dir = ROOT_PATH / "data" / "datasets" / "ljspeech_processed"
-        else:
-            data_dir = Path(data_dir)
+        data_dir = Path(model_config["data_dir"])
 
         with open(data_dir / "pitch_energy_stats.json", "r") as f:
             pitch_energy_stats = json.load(f)
             self.pitch_stats = pitch_energy_stats["pitch"]
             self.energy_stats = pitch_energy_stats["energy"]
         
-        self.num_bins = model_config["num_bins"]
-        self.quantization_log_scaling = model_config["quantization_log_scaling"]
+        self.num_bins = model_config["variance_adaptor"]["num_bins"]
+        self.quantization_log_scaling = \
+            model_config["variance_adaptor"]["quantization_log_scaling"]
         
         for feature in ["pitch", "energy"]:
             setattr(
@@ -114,5 +111,5 @@ class VarianceAdaptor(nn.Module):
             "duration": duration,
             "pitch": pitch,
             "energy": energy,
-            "mel_length": mel_length
+            "mel-length": mel_length
         }

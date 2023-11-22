@@ -20,7 +20,8 @@
         "filter_length": 1024,
         "hop_length": 256,
         "win_length": 1024,
-        "sampling_rate": 22050
+        "sampling_rate": 22050,
+        "n_mel_channels": 80
       },
       "mfa": {
         "perform": false,
@@ -35,9 +36,38 @@
       "wave": [],
       "spectrogram": []
     },
-    "arch": {
+    "model": {
       "type": "FastSpeech2",
-      "args": {}
+      "args": {
+        "data_dir": "/content/dla2023-tts/data/datasets/ljspeech/data",
+        "variance_adaptor": {
+          "num_bins": 256,
+          "quantization_log_scaling": true
+        },
+        "encoder_decoder": {
+          "max_seq_len": 1000,
+          "vocab_size": 256,
+          "fft_conv1d_kernel": [9, 1],
+          "fft_conv1d_padding": [4, 0],
+          "encoder_layer": 4,
+          "encoder_head": 2,
+          "encoder_dim": 256,
+          "encoder_conv1d_filter_size": 1024,
+          "encoder_dropout": 0.2,
+          "decoder_layer": 4,
+          "decoder_head": 2,
+          "decoder_dim": 256,
+          "decoder_conv1d_filter_size": 1024,
+          "decoder_dropout": 0.2,
+          "pad_idx": 0
+        },
+        "variance_predictor": {
+          "filter_size": 256,
+          "kernel_size": 3,
+          "dropout": 0.1
+        },
+        "n_mel_channels": 80 
+      }
     },
     "data": {
       "train": {

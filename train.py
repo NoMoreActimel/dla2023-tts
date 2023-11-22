@@ -35,7 +35,7 @@ def main(config):
 
     # build model architecture, then print to console
     model = config.init_obj(
-        config["arch"],
+        config["model"],
         module_arch,
         config=config.config
     )

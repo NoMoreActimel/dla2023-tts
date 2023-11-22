@@ -26,7 +26,7 @@ class Encoder(nn.Module):
         
         len_max_seq = model_config["max_seq_len"]
         n_position = len_max_seq + 1
-        n_layers = model_config["encoder_n_layer"]
+        n_layers = model_config["encoder_layer"]
 
         self.src_word_emb = nn.Embedding(
             model_config["vocab_size"],
@@ -80,28 +80,26 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     """ Decoder """
 
-    def __init__(self, model_config, len_max_seq=None):
+    def __init__(self, model_config):
         super(Decoder, self).__init__()
 
         self.model_config = model_config
 
-        if len_max_seq is None:
-            len_max_seq = model_config["max_seq_len"]
-        n_position = len_max_seq + 1
-        n_layers = model_config["decoder_n_layer"]
+        len_max_seq = model_config["max_seq_len"]
+        n_layers = model_config["decoder_layer"]
 
         self.position_enc = nn.Embedding(
-            n_position,
-            model_config["encoder_dim"],
+            len_max_seq + 1,
+            model_config["decoder_dim"],
             padding_idx=model_config["pad_idx"],
         )
 
         self.layer_stack = nn.ModuleList([FFTBlock(
-            d_model=model_config["encoder_dim"],
-            d_inner=model_config["encoder_conv1d_filter_size"],
-            n_head=model_config["encoder_head"],
-            d_k=model_config["encoder_dim"] // model_config["encoder_head"],
-            d_v=model_config["encoder_dim"] // model_config["encoder_head"],
+            d_model=model_config["decoder_dim"],
+            d_inner=model_config["decoder_conv1d_filter_size"],
+            n_head=model_config["decoder_head"],
+            d_k=model_config["decoder_dim"] // model_config["decoder_head"],
+            d_v=model_config["decoder_dim"] // model_config["decoder_head"],
             dropout=model_config["dropout"]
         ) for _ in range(n_layers)])
 
