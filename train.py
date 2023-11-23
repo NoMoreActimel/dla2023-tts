@@ -25,11 +25,7 @@ np.random.seed(SEED)
 
 def main(config):
     logger = config.get_logger("train")
-
-    # text_encoder
-    # text_encoder = config.get_text_encoder()
-    text_encoder = None
-
+    
     # setup data_loader instances
     dataloaders = get_dataloaders(config)
 
