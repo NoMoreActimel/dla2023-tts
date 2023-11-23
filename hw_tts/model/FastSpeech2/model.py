@@ -1,5 +1,4 @@
 import torch
-# import waveglow
 
 from torch import nn
 
@@ -102,13 +101,14 @@ class FastSpeech2(nn.Module):
             duration_coeff=1.0,
             pitch_coeff=1.0,
             energy_coeff=1.0,
-            WaveGlow=None):
+            WaveGlow=None,
+            waveglow_inference=None):
     
         if WaveGlow is not None:
             if self.WaveGlow is None:
                 self.WaveGlow = WaveGlow
         else:
-            assert self.WaveGlow is not None, f"No WaveGlow provided for inference"
+            assert self.WaveGlow is not None, f"No WaveGlow object provided for inference"
             WaveGlow = self.WaveGlow
         
         with torch.no_grad():
@@ -123,4 +123,4 @@ class FastSpeech2(nn.Module):
         mel_predict = output["mel_predict"].transpose(1, 2)
         desc = f"predicts for: duration = {duration_coeff}, "\
             f"pitch = {pitch_coeff}, energy = {energy_coeff}"
-        waveglow.inference.inference(mel_predict, WaveGlow, desc)
+        waveglow_inference(mel_predict, WaveGlow, desc)

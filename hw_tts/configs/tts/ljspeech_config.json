@@ -109,7 +109,8 @@
             }
           }
         ]
-      }
+      },
+      "inference_path": "/content/dla2023-tts/data/datasets/ljspeech/inference"
     },
     "optimizer": {
       "type": "Adam",

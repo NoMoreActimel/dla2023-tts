@@ -11,24 +11,20 @@ from torchvision.transforms import ToTensor
 from tqdm import tqdm
 
 from hw_tts.base import BaseTrainer
-from hw_tts.base.base_text_encoder import BaseTextEncoder
 from hw_tts.logger.utils import plot_spectrogram_to_buf
-from hw_tts.metric.utils import calc_cer, calc_wer
 from hw_tts.utils import inf_loop, MetricTracker
+from hw_tts.inference import run_inference
 
 
 class Trainer(BaseTrainer):
     """
     Trainer class
     """
-
     def __init__(
             self,
             model,
             criterion,
             metrics,
-            rare_eval_metrics,
-            n_epochs_frequency,
             optimizer,
             config,
             device,
@@ -39,7 +35,7 @@ class Trainer(BaseTrainer):
             skip_oom=True,
     ):
         super().__init__(
-            model, criterion, metrics, rare_eval_metrics, n_epochs_frequency,
+            model, criterion, metrics,
             optimizer, lr_scheduler, config, device
         )
         self.skip_oom = skip_oom
@@ -57,18 +53,19 @@ class Trainer(BaseTrainer):
         self.log_step = 50
 
         self.train_metrics = MetricTracker(
-            "loss", "sisdr_loss", "ce_loss", "speaker_accuracy", "grad norm", 
+            "loss", "mel_loss", "duration_loss", "pitch_loss", "energy_loss", "grad norm", 
             *[m.name for m in self.metrics if self._compute_on_train(m)],
             writer=self.writer
         )
-        self.evaluation_metrics = MetricTracker(
-            "loss", "sisdr_loss", "ce_loss", "speaker_accuracy",
-            *[m.name for m in self.metrics],
-            writer=self.writer
-        )
-        self.rare_evaluation_metrics = MetricTracker(
-            *[m.name for m in self.rare_eval_metrics], writer=self.writer
-        ) if self.n_epochs_frequency else None
+
+        self.datasets = {
+            key: dataloader.dataset for key, dataloader in dataloaders.items()
+        }
+        self.inference_indices = {
+            "train": [30, 40, 50],
+            "val": [30, 40, 50]
+        }
+        self.inference_path = config["data"]["inference_path"]
 
 
     @staticmethod
@@ -96,7 +93,7 @@ class Trainer(BaseTrainer):
                 self.model.parameters(), self.config["trainer"]["grad_norm_clip"]
             )
 
-    def _train_epoch(self, epoch, do_rare_eval=False):
+    def _train_epoch(self, epoch):
         """
         Training logic for an epoch
 
@@ -141,11 +138,7 @@ class Trainer(BaseTrainer):
                     last_lr = self.lr_scheduler.get_last_lr()[0]
 
                 self.writer.add_scalar("learning rate", last_lr)
-                # self._log_predictions(**batch, log_rare_metrics=do_rare_eval)
-                # self._log_spectrogram(batch["spectrogram"])
-                self._log_audio(batch["input"], "mixed_audio")
-                self._log_audio(batch["ref"], "ref_audio")
-                self._log_audio(batch["predicts"]["L1"], "predicted_audio")
+                self._log_spectrogram(batch["mel_predict"])
                 self._log_scalars(self.train_metrics)
                 # we don't want to reset train metrics at the start of every epoch
                 # because we are interested in recent train metrics
@@ -153,18 +146,21 @@ class Trainer(BaseTrainer):
                 self.train_metrics.reset()
             if batch_idx >= self.len_epoch:
                 break
-        log = last_train_metrics
-        
-        for part, dataloader in self.evaluation_dataloaders.items():
-            val_log, rare_val_log = self._evaluation_epoch(epoch, part, dataloader, do_rare_eval)
-            log.update(**{f"{part}_{name}": value for name, value in val_log.items()})
-            if do_rare_eval:
-                log.update(**{f"{part}_{name}": value for name, value in rare_val_log.items()})
-        
-        if isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-            self.lr_scheduler.step(val_log["loss"])
 
+        for dataset_type in ["train", "val"]:
+            run_inference(
+                model=self.model,
+                dataset=self.datasets[dataset_type],
+                dataset_type="train",
+                indices=self.inference_indices[dataset_type],
+                duration_coeffs=[1.0],
+                pitch_coeffs=[1.0],
+                energy_coeffs=[1.0]
+            )
+
+        log = last_train_metrics
         return log
+
 
     def process_batch(
             self, batch, is_train: bool, metrics_tracker: MetricTracker,
@@ -202,43 +198,6 @@ class Trainer(BaseTrainer):
     
         return batch
 
-    def _evaluation_epoch(self, epoch, part, dataloader, do_rare_eval=False):
-        """
-        Validate after training an epoch
-
-        :param epoch: Integer, current training epoch.
-        :return: A log that contains information about validation
-        """
-        self.model.eval()
-        self.evaluation_metrics.reset()
-        if do_rare_eval and self.rare_evaluation_metrics:
-            self.rare_evaluation_metrics.reset()
-
-        with torch.no_grad():
-            for batch_idx, batch in tqdm(
-                    enumerate(dataloader),
-                    desc=part,
-                    total=len(dataloader),
-            ):
-                batch = self.process_batch(
-                    batch,
-                    is_train=False,
-                    metrics_tracker=self.evaluation_metrics,
-                    rare_metrics_tracker=self.rare_evaluation_metrics if do_rare_eval else None
-                )
-            self.writer.set_step(epoch * self.len_epoch, part)
-            self._log_scalars(self.evaluation_metrics)
-            # self._log_predictions(**batch, log_rare_metrics=do_rare_eval)
-            # self._log_spectrogram(batch["spectrogram"])
-            self._log_audio(batch["input"], "mixed_audio")
-            self._log_audio(batch["ref"], "ref_audio")
-            self._log_audio(batch["predicts"]["L1"], "predicted_audio")
-
-        # add histogram of model parameters to the tensorboard
-        for name, p in self.model.named_parameters():
-            self.writer.add_histogram(name, p, bins="auto")
-        
-        return self.evaluation_metrics.result(), self.rare_evaluation_metrics.result() if do_rare_eval else None
 
     def _progress(self, batch_idx):
         base = "[{}/{} ({:.0f}%)]"
@@ -250,96 +209,10 @@ class Trainer(BaseTrainer):
             total = self.len_epoch
         return base.format(current, total, 100.0 * current / total)
 
-    def _log_predictions(
-            self,
-            text,
-            log_probs,
-            log_probs_length,
-            audio_path,
-            examples_to_log=10,
-            log_rare_metrics=False,
-            *args,
-            **kwargs,
-    ):
-        if self.writer is None:
-            return
-        
-        log_probs = log_probs[:examples_to_log].detach().cpu()
-        log_probs_length = log_probs_length[:examples_to_log].detach().cpu().numpy()
-
-        argmax_inds = log_probs.argmax(-1).numpy()
-        argmax_inds = [
-            inds[: int(ind_len)]
-            for inds, ind_len in list(zip(argmax_inds, log_probs_length))
-        ]
-        argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
-
-        if hasattr(self.text_encoder, "ctc_decode"):
-            argmax_texts = [
-                self.text_encoder.ctc_decode(inds) 
-                for inds in argmax_inds
-            ]
-            if self.text_encoder.use_lm:
-                beam_search_predictions = self.text_encoder.ctc_lm_beam_search(
-                    log_probs, log_probs_length
-                ) if log_rare_metrics else None
-            else:
-                beam_search_predictions = [
-                    self.text_encoder.ctc_beam_search(log_probs_line, length)[0].text
-                    for log_probs_line, length in list(zip(log_probs, log_probs_length))
-                ] if log_rare_metrics else None
-            # here we log predefined metrics, so
-            # we hardcoded beamsearch logging, as it was with argmax-texts
-            # each new rare-metric logging should be implemented the same way
-        
-        tuples = list(zip(text, argmax_texts_raw, audio_path))
-        shuffle(tuples)
-        rows = {}
-        for i, (target, raw_pred, audio_path) in enumerate(tuples[:examples_to_log]):
-            if hasattr(self.text_encoder, "ctc_decode"):
-                pred = argmax_texts[i]
-                beam_search_pred = beam_search_predictions[i] if beam_search_predictions else None
-
-            target = BaseTextEncoder.normalize_text(target)
-            wer_raw = calc_wer(target, raw_pred) * 100
-            cer_raw = calc_cer(target, raw_pred) * 100
-
-            rows[Path(audio_path).name] = {
-                "target": target,
-                "raw prediction": raw_pred,
-                "wer raw": wer_raw,
-                "cer raw": cer_raw,
-            }
-
-            if hasattr(self.text_encoder, "ctc_decode"):
-                wer_argmax = calc_wer(target, pred) * 100
-                cer_argmax = calc_cer(target, pred) * 100
-                rows[Path(audio_path).name].update({
-                    "predictions": pred,
-                    "beam search prediction": beam_search_pred,
-                    "wer argmax": wer_argmax,
-                    "cer argmax": cer_argmax,
-                })
-                
-                if log_rare_metrics:
-                    wer_beamsearch = calc_wer(target, beam_search_pred) * 100
-                    cer_beamsearch = calc_cer(target, beam_search_pred) * 100
-                    rows[Path(audio_path).name].update({
-                        "wer beamsearch": wer_beamsearch,
-                        "cer beamsearch": cer_beamsearch
-                    })
-
-        self.writer.add_table("predictions", pd.DataFrame.from_dict(rows, orient="index"))
-
     def _log_spectrogram(self, spectrogram_batch):
         spectrogram = random.choice(spectrogram_batch.cpu())
         image = PIL.Image.open(plot_spectrogram_to_buf(spectrogram))
         self.writer.add_image("spectrogram", ToTensor()(image))
-
-    def _log_audio(self, audio_batch, audio_name="audio"):
-        audio = random.choice(audio_batch)
-        sample_rate = self.config["preprocessing"]["sr"]
-        self.writer.add_audio(audio_name, audio, sample_rate=sample_rate)
 
     @torch.no_grad()
     def get_grad_norm(self, norm_type=2):

@@ -50,16 +50,6 @@ def main(config):
         for metric_dict in config["metrics"]
     ]
 
-    if "rare_eval_metrics" in config.config:
-        rare_eval_metrics = [
-            config.init_obj(metric_dict, module_metric, text_encoder=text_encoder)
-            for metric_dict in config["rare_eval_metrics"]["metrics"]
-        ]
-        n_epochs_frequency = config["rare_eval_metrics"]["n_epochs_frequency"]
-    else:
-        rare_eval_metrics = None
-        n_epochs_frequency = None
-
     # build optimizer, learning rate scheduler. delete every line containing lr_scheduler for
     # disabling scheduler
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
@@ -70,8 +60,6 @@ def main(config):
         model,
         loss_module,
         metrics,
-        rare_eval_metrics,
-        n_epochs_frequency,
         optimizer,
         text_encoder=text_encoder,
         config=config,

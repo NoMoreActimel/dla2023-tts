@@ -20,7 +20,8 @@ class FastSpeech2Loss(nn.Module):
                 mel_target,
                 duration_target,
                 pitch_target,
-                energy_target):
+                energy_target,
+                **kwargs):
         
         mel_loss = self.mae_loss(mel_predict, mel_target)
         

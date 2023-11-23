@@ -64,7 +64,6 @@ class Encoder(nn.Module):
         )
         
         # -- Forward
-        print(src_seq.shape, src_seq.max(), self.model_config["vocab_size"])
         enc_output = self.src_word_emb(src_seq) + self.position_enc(src_pos)
 
         for enc_layer in self.layer_stack:

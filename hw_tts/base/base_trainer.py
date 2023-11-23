@@ -17,8 +17,6 @@ class BaseTrainer:
             model: BaseModel,
             criterion,
             metrics,
-            rare_eval_metrics,
-            n_epochs_frequency,
             optimizer, 
             lr_scheduler, 
             config, 
@@ -30,8 +28,6 @@ class BaseTrainer:
         self.model = model
         self.criterion = criterion
         self.metrics = metrics
-        self.rare_eval_metrics = rare_eval_metrics
-        self.n_epochs_frequency = n_epochs_frequency
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
 
@@ -92,8 +88,7 @@ class BaseTrainer:
         not_improved_count = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
             self._last_epoch = epoch
-            do_rare_eval = self.n_epochs_frequency and epoch % self.n_epochs_frequency == 0
-            result = self._train_epoch(epoch, do_rare_eval)
+            result = self._train_epoch(epoch)
 
             # save logged informations into log dict
             log = {"epoch": epoch}
