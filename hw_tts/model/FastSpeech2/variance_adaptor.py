@@ -86,32 +86,6 @@ class VarianceAdaptor(nn.Module):
         # Duration
         log_duration = self.duration_predictor(src_seq)
 
-        # if duration_target is not None:
-        #     output, mel_length = self.length_regulator(
-        #         src_seq, durations=None, target=duration_target, mel_max_length=max_mel_length
-        #     )
-        #     duration = duration_target
-        # else:
-        #     duration = torch.round((torch.exp(log_duration) - 1) * duration_coeff).long()
-        #     duration[duration < 0] = 0
-        #     print(duration)
-        #     output, mel_length = self.length_regulator(
-        #         src_seq, durations=duration, target=None, mel_max_length=None
-        #     )
-
-        # if duration_target is not None:
-        #     output, mel_len = self.length_regulator(src_seq, duration_target, max_mel_length)
-        #     duration_rounded = duration_target
-        # else:
-        #     duration_rounded = torch.clamp(
-        #         (torch.round(torch.exp(log_duration) - 1) * duration_coeff),
-        #         min=0,
-        #     )
-        #     output, mel_len = self.length_regulator(src_seq, duration_rounded, max_mel_length)
-
-        log_duration = self.duration_predictor(src_seq)
-        
-
         if duration_target is not None:
             output, mel_length = self.length_regulator(
                 src_seq, durations=None, target=duration_target, mel_max_length=max_mel_length

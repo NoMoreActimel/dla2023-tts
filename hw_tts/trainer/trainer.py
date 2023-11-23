@@ -4,7 +4,9 @@ from random import shuffle
 
 import PIL
 import pandas as pd
+import librosa
 import torch
+import numpy as np
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
 from torchvision.transforms import ToTensor
@@ -159,7 +161,7 @@ class Trainer(BaseTrainer):
 
         if self.device.type == "cuda":
             for dataset_type in ["train", "val"]:
-                run_inference(
+                inference_paths = run_inference(
                     model=self.model,
                     dataset=self.datasets[dataset_type],
                     dataset_type="train",
@@ -171,6 +173,8 @@ class Trainer(BaseTrainer):
                     energy_coeffs=[1.0],
                     epoch=epoch
                 )
+                # for inference_path in inference_paths:
+                #     self._log_predictions(inference_path, dataset_type)
 
         log = last_train_metrics
         return log
@@ -223,10 +227,27 @@ class Trainer(BaseTrainer):
             total = self.len_epoch
         return base.format(current, total, 100.0 * current / total)
 
-    def _log_spectrogram(self, spectrogram_batch):
+    def _log_spectrogram(self, spectrogram_batch, name="spectrogram"):
         spectrogram = random.choice(spectrogram_batch.cpu())
         image = PIL.Image.open(plot_spectrogram_to_buf(spectrogram))
-        self.writer.add_image("spectrogram", ToTensor()(image))
+        self.writer.add_image(name, ToTensor()(image))
+
+    def _log_audio(self, audio, name="audio"):
+        sample_rate = self.config["preprocessing"]["sr"]
+        self.writer.add_audio(name, audio, sample_rate=sample_rate)
+    
+    def _log_predictions(self, paths, dataset_type):
+        # not tested yet
+        ind = random.choice(self.inference_indices[dataset_type])
+        path = paths[ind]
+        name = f"utterance_{ind}"
+        
+        wav, _ = librosa.load(path + ".wav")
+        self._log_audio(wav, "audio_" + name)
+
+        spec = np.load(path + ".spec")
+        self._log_spectrogram([spec], "spectrogram_" + name)
+
 
     @torch.no_grad()
     def get_grad_norm(self, norm_type=2):

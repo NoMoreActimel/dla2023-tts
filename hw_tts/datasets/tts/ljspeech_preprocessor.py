@@ -323,7 +323,7 @@ class LJSpeechPreprocessor:
         energy = energy[:total_duration]
 
         np.save(self.duration_path / f"{name}_duration.npy", durations)
-        np.save(self.spec_path / f"{name}_spec.npy", mel_spectrogram.T)
+        np.save(self.spec_path / f"{name}_spec.npy", mel_spectrogram.transpose(1, 2))
         # np.save(self.pitch_path / f"{name}_pitch.npy", pitch_f0)
         # np.save(self.energy_path / f"{name}_energy.npy", energy)
 

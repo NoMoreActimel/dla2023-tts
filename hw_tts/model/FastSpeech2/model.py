@@ -67,9 +67,6 @@ class FastSpeech2(nn.Module):
         output = self.decoder(output, mel_pos)
 
         mel_mask = self.get_mel_mask(output, mel_pos, max_mel_length)
-        # max_length_mask = torch.arange(0, max_mel_length).unsqueeze(0).to(output.device)
-        # mel_mask = (max_length_mask >= mel_pos).unsqueeze(1, 2)
-        # mel_mask = mel_mask.expand(-1, -1, output.shape[2])
         output = output.masked_fill(mel_mask, 0.0)
 
         output = self.mel_decoder(output)

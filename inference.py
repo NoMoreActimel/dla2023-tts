@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from pathlib import Path
 
@@ -31,13 +32,23 @@ def run_inference(
         energy_coeffs=[1.0],
         epoch=None
     ):
-    path = Path(inference_path)
-    path.mkdir(exist_ok=True, parents=True)
+    inference_path = Path(inference_path) / dataset_type
+    inference_path.mkdir(exist_ok=True, parents=True)
+
+    inference_paths = [inference_path / f"utterance_{ind}" for ind in indices]
+    
+    for i, path in enumerate(inference_paths):
+        if epoch is not None:
+            inference_paths[i] = path / f"epoch{epoch}"
+        inference_paths[i].mkdir(exist_ok=True, parents=True)
 
     WaveGlow = get_WaveGlow(waveglow_path)
 
-    batch = dataset.collate_fn([dataset[ind] for ind in indices])
+    dataset_items = [dataset[ind] for ind in indices]
+    batch = dataset.collate_fn(dataset_items)
     batch = move_batch_to_device(batch, device='cuda:0')
+
+    paths = []
 
     for duration_coeff in duration_coeffs:
         for pitch_coeff in pitch_coeffs:
@@ -54,8 +65,13 @@ def run_inference(
                 mel_predicts = output["mel_predict"].transpose(1, 2)
 
                 for ind, mel_predict in zip(indices, mel_predicts):
-                    path = inference_path + \
-                        f"/{dataset_type}_epoch{epoch}_utterance_{ind}:_" \
+                    path = inference_path / \
+                        f"utterance_{ind}:_" \
                         f"duration={duration_coeff}_pitch={pitch_coeff}_" \
-                        f"energy={energy_coeff}.wav"
-                    waveglow.inference(mel_predict.unsqueeze(0), WaveGlow, path)
+                        f"energy={energy_coeff}"
+
+                    np.save(path + ".spec", mel_predict)
+                    waveglow.inference(mel_predict.unsqueeze(0), WaveGlow, path + ".wav")
+                    paths.append(path)
+    
+    return paths
