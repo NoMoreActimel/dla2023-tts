@@ -1,178 +1,81 @@
-import argparse
-import json
-import os
+import torch
+import numpy as np
+
 from pathlib import Path
 
-import torch
-from tqdm import tqdm
-
-import hw_tts.model as module_model
-from hw_tts.loss import SpExPlusLoss
-from hw_tts.metric import SiSDRMetric, PESQMetric
-from hw_tts.trainer import Trainer
-from hw_tts.utils import ROOT_PATH
-from hw_tts.utils.object_loading import get_dataloaders
-from hw_tts.utils.parse_config import ConfigParser
-
-DEFAULT_CHECKPOINT_PATH = ROOT_PATH / "default_test_model" / "checkpoint.pth"
+from utils import get_WaveGlow
+import hw_tts.waveglow as waveglow
 
 
-def main(config, out_file):
-    logger = config.get_logger("test")
-
-    # define cpu or gpu if possible
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # text_encoder
-    text_encoder = config.get_text_encoder()
-
-    # setup data_loader instances
-    dataloaders = get_dataloaders(config, text_encoder)
-
-    # build model architecture
-    model = config.init_obj(config["arch"], module_model, n_class=len(text_encoder))
-    logger.info(model)
-
-    logger.info("Loading checkpoint: {} ...".format(config.resume))
-    checkpoint = torch.load(config.resume, map_location=device)
-    state_dict = checkpoint["state_dict"]
-    if config["n_gpu"] > 1:
-        model = torch.nn.DataParallel(model)
-    model.load_state_dict(state_dict)
-
-    # prepare model for testing
-    model = model.to(device)
-    model.eval()
-
-    results = []
-
-    loss = SpExPlusLoss()
-    sisdr_metric = SiSDRMetric()
-    pesq_metric = PESQMetric()
-
-    n = 0
-    losses = 0.
-    sisdrs = 0.
-    pesqs = 0.
-
-    with torch.no_grad():
-        for batch_num, batch in enumerate(tqdm(dataloaders["test"])):
-            batch = Trainer.move_batch_to_device(batch, device)
-            output, _ = model(**batch)
-            batch["predicts"] = output
-
-            sisdr_loss, _, _ = loss(**batch)
-            sisdr = sisdr_metric(**batch)
-            pesq = pesq_metric(**batch)
-
-            losses.append(sisdr_loss)
-            sisdrs.append(sisdr)
-            pesqs.append(pesq)
-            n += 1
+def move_batch_to_device(batch, device: torch.device):
+    """
+    Move all necessary tensors to the HPU
+    """
+    for tensor_for_gpu in [
+        "src_seq", "src_pos", "mel_target", "mel_pos", 
+        "duration_target", "pitch_target", "energy_target"
+    ]:
+        batch[tensor_for_gpu] = batch[tensor_for_gpu].to(device)
     
-    results.append({
-        "SiSDR manual": -losses / n,
-        "SiSDR torch": sisdrs / n,
-        "PESQ torch": pesqs / n,
-    })
-
-    with Path(out_file).open("w") as f:
-        json.dump(results, f, indent=2)
+    return batch
 
 
-if __name__ == "__main__":
-    args = argparse.ArgumentParser(description="PyTorch Template")
-    args.add_argument(
-        "-c",
-        "--config",
-        default=None,
-        type=str,
-        help="config file path (default: None)",
-    )
-    args.add_argument(
-        "-r",
-        "--resume",
-        default=str(DEFAULT_CHECKPOINT_PATH.absolute().resolve()),
-        type=str,
-        help="path to latest checkpoint (default: None)",
-    )
-    args.add_argument(
-        "-d",
-        "--device",
-        default=None,
-        type=str,
-        help="indices of GPUs to enable (default: all)",
-    )
-    args.add_argument(
-        "-o",
-        "--output",
-        default="output.json",
-        type=str,
-        help="File to write results (.json)",
-    )
-    args.add_argument(
-        "-t",
-        "--test-data-folder",
-        default=None,
-        type=str,
-        help="Path to dataset",
-    )
-    args.add_argument(
-        "-b",
-        "--batch-size",
-        default=20,
-        type=int,
-        help="Test dataset batch size",
-    )
-    args.add_argument(
-        "-j",
-        "--jobs",
-        default=1,
-        type=int,
-        help="Number of workers for test dataloader",
-    )
+def run_inference(
+        model,
+        dataset,
+        indices,
+        waveglow_path,
+        dataset_type="train",
+        inference_path="",
+        duration_coeffs=[1.0],
+        pitch_coeffs=[1.0],
+        energy_coeffs=[1.0],
+        epoch=None
+    ):
+    inference_path = Path(inference_path) / dataset_type
+    inference_path.mkdir(exist_ok=True, parents=True)
 
-    args = args.parse_args()
+    inference_paths = [inference_path / f"utterance_{ind}" for ind in indices]
+    
+    for i, path in enumerate(inference_paths):
+        if epoch is not None:
+            inference_paths[i] = path / f"epoch{epoch}"
+        inference_paths[i].mkdir(exist_ok=True, parents=True)
 
-    # set GPUs
-    if args.device is not None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = args.device
+    WaveGlow = get_WaveGlow(waveglow_path)
 
-    # first, we need to obtain config with model parameters
-    # we assume it is located with checkpoint in the same folder
-    model_config = Path(args.resume).parent / "config.json"
-    with model_config.open() as f:
-        config = ConfigParser(json.load(f), resume=args.resume)
+    dataset_items = [dataset[ind] for ind in indices]
+    batch = dataset.collate_fn(dataset_items)
+    batch = move_batch_to_device(batch, device='cuda:0')
 
-    # update with addition configs from `args.config` if provided
-    if args.config is not None:
-        with Path(args.config).open() as f:
-            config.config.update(json.load(f))
+    paths = []
 
-    # if `--test-data-folder` was provided, set it as a default test set
-    if args.test_data_folder is not None:
-        test_data_folder = Path(args.test_data_folder).absolute().resolve()
-        assert test_data_folder.exists()
-        config.config["data"] = {
-            "test": {
-                "batch_size": args.batch_size,
-                "num_workers": args.jobs,
-                "datasets": [
-                    {
-                        "type": "CustomDirAudioDataset",
-                        "args": {
-                            "audio_dir": str(test_data_folder / "audio"),
-                            "transcription_dir": str(
-                                test_data_folder / "transcriptions"
-                            ),
-                        },
-                    }
-                ],
-            }
-        }
+    for duration_coeff in duration_coeffs:
+        for pitch_coeff in pitch_coeffs:
+            for energy_coeff in energy_coeffs:
+                with torch.no_grad():
+                    print(batch["src_seq"].shape)
+                    print(batch["src_pos"].shape)
+                    output = model.forward(**{
+                        "src_seq": batch["src_seq"],
+                        "src_pos": batch["src_pos"],
+                        "duration_coeff": duration_coeff,
+                        "pitch_coeff": pitch_coeff,
+                        "energy_coeff": energy_coeff
+                    })
+                
+                mel_predicts = output["mel_predict"].transpose(1, 2)
 
-    assert config.config.get("data", {}).get("test", None) is not None
-    config["data"]["test"]["batch_size"] = args.batch_size
-    config["data"]["test"]["n_jobs"] = args.jobs
+                for i, (ind, mel_predict) in enumerate(zip(indices, mel_predicts)):
+                    filename =  f"duration={duration_coeff}_pitch={pitch_coeff}_" \
+                                f"energy={energy_coeff}"
 
-    main(config, args.output)
+                    np.save(inference_paths[i] / (filename + ".spec"), mel_predict.cpu())
+                    waveglow.inference(
+                        mel_predict.unsqueeze(0),
+                        WaveGlow,
+                        inference_paths[i] / (filename + ".wav")
+                    )
+                    paths.append(path)
+    
+    return paths

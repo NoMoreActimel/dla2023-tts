@@ -54,6 +54,8 @@ def run_inference(
         for pitch_coeff in pitch_coeffs:
             for energy_coeff in energy_coeffs:
                 with torch.no_grad():
+                    print(batch["src_seq"].shape)
+                    print(batch["src_pos"].shape)
                     output = model.forward(**{
                         "src_seq": batch["src_seq"],
                         "src_pos": batch["src_pos"],
@@ -64,14 +66,16 @@ def run_inference(
                 
                 mel_predicts = output["mel_predict"].transpose(1, 2)
 
-                for ind, mel_predict in zip(indices, mel_predicts):
-                    path = inference_path / \
-                        f"utterance_{ind}:_" \
-                        f"duration={duration_coeff}_pitch={pitch_coeff}_" \
-                        f"energy={energy_coeff}"
+                for i, (ind, mel_predict) in enumerate(zip(indices, mel_predicts)):
+                    filename =  f"duration={duration_coeff}_pitch={pitch_coeff}_" \
+                                f"energy={energy_coeff}"
 
-                    np.save(path + ".spec", mel_predict)
-                    waveglow.inference(mel_predict.unsqueeze(0), WaveGlow, path + ".wav")
+                    np.save(inference_paths[i] / (filename + ".spec"), mel_predict.cpu())
+                    waveglow.inference(
+                        mel_predict.unsqueeze(0),
+                        WaveGlow,
+                        inference_paths[i] / (filename + ".wav")
+                    )
                     paths.append(path)
     
     return paths

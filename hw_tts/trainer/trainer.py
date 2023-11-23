@@ -241,8 +241,9 @@ class Trainer(BaseTrainer):
         ind = random.choice(self.inference_indices[dataset_type])
         path = paths[ind]
         name = f"utterance_{ind}"
+        filename = path.split('/')[-1]
         
-        wav, _ = librosa.load(path + ".wav")
+        wav, _ = librosa.load(self.config["data"][dataset_type]["data_dir"] + f"/{filename}.wav")
         self._log_audio(wav, "audio_" + name)
 
         spec = np.load(path + ".spec")
