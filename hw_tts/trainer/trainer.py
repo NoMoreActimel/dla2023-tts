@@ -69,6 +69,13 @@ class Trainer(BaseTrainer):
             "train": config["data"]["train"]["inference_path"],
             "val": config["data"]["val"]["inference_path"]
         }
+        self.waveglow_paths = {
+            "train": config["data"]["train"]["waveglow_path"],
+            "val": config["data"]["val"]["waveglow_path"]
+        }
+
+        if self.device.type != "cuda":
+            print("WaveGlow inference could be processed only on cuda:0, now on cpu!")
 
 
     @staticmethod
@@ -150,17 +157,19 @@ class Trainer(BaseTrainer):
             if batch_idx >= self.len_epoch:
                 break
 
-        for dataset_type in ["train", "val"]:
-            run_inference(
-                model=self.model,
-                dataset=self.datasets[dataset_type],
-                dataset_type="train",
-                inference_path=self.inference_paths[dataset_type],
-                indices=self.inference_indices[dataset_type],
-                duration_coeffs=[1.0],
-                pitch_coeffs=[1.0],
-                energy_coeffs=[1.0]
-            )
+        if self.device.type == "cuda":
+            for dataset_type in ["train", "val"]:
+                run_inference(
+                    model=self.model,
+                    dataset=self.datasets[dataset_type],
+                    dataset_type="train",
+                    inference_path=self.inference_paths[dataset_type],
+                    waveglow_path=self.waveglow_paths[dataset_type],
+                    indices=self.inference_indices[dataset_type],
+                    duration_coeffs=[1.0],
+                    pitch_coeffs=[1.0],
+                    energy_coeffs=[1.0]
+                )
 
         log = last_train_metrics
         return log

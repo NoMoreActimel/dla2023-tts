@@ -87,6 +87,7 @@
         "batch_size": 10,
         "num_workers": 5,
         "inference_path": "/content/dla2023-tts/data/datasets/ljspeech/inference",
+        "waveglow_path": "/content/dla2023-tts/waveglow/pretrained_model/waveglow_256channels.pt",
         "datasets": [
           {
             "type": "LJspeechFastSpeech2Dataset",
@@ -101,6 +102,7 @@
         "batch_size": 10,
         "num_workers": 5,
         "inference_path": "/content/dla2023-tts/data/datasets/ljspeech/inference",
+        "waveglow_path": "/content/dla2023-tts/waveglow/pretrained_model/waveglow_256channels.pt",
         "datasets": [
           {
             "type": "LJspeechFastSpeech2Dataset",
@@ -137,7 +139,7 @@
       "save_dir": "saved/",
       "save_period": 5,
       "verbosity": 2,
-      "monitor": "min val_loss",
+      "monitor": "min loss",
       "early_stop": 100,
       "visualize": "wandb",
       "wandb_project": "ss_project",

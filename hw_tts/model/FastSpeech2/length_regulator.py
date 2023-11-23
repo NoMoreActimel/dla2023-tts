@@ -46,10 +46,12 @@ class LengthRegulator(nn.Module):
             )
         return output
 
-    def forward(self, input, durations, mel_max_length=None):
-        if durations is not None:
-            return self.LR(input, durations, mel_max_length), durations
+    def forward(self, input, durations=None, target=None, mel_max_length=None):
+        if target is not None:
+            output = self.LR(input, target, mel_max_length)
+            return output, durations
         
+        # durations are rounded already
         output = self.LR(input, durations)
         mel_pos = torch.arange(1, output.shape[1] + 1, dtype=torch.long).unsqueeze(0)
         return output, mel_pos.to(output.device)

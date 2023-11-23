@@ -26,7 +26,7 @@ class VarianceAdaptor(nn.Module):
         data_dir = Path(model_config["data_dir"])
 
         pitch_energy_stats = self.adaptor_config.get("pitch_energy_stats", None)
-        
+
         if pitch_energy_stats is None:
             with open(data_dir / "pitch_energy_stats.json", "r") as f:
                 pitch_energy_stats = json.load(f)
@@ -53,12 +53,18 @@ class VarianceAdaptor(nn.Module):
             feature_max = torch.tensor(getattr(self, f"{feature}_stats")["max"])
 
             if self.quantization_log_scaling:
-                feature_scale = torch.exp(torch.linspace(
-                    torch.log(1 + feature_min), torch.log(1 + feature_max), self.num_bins
-                ))
+                feature_scale = nn.Parameter(
+                    torch.exp(torch.linspace(
+                        torch.log(1 + feature_min), torch.log(1 + feature_max), self.num_bins
+                    )),
+                    requires_grad=False
+                )
             else:
-                feature_scale = torch.linspace(
-                    feature_min, feature_max, self.num_bins
+                feature_scale = nn.Parameter(
+                    torch.linspace(
+                        feature_min, feature_max, self.num_bins
+                    ),
+                    requires_grad=False
                 )
         
             setattr(
@@ -69,7 +75,7 @@ class VarianceAdaptor(nn.Module):
     def forward(
             self,
             src_seq,
-            max_mel_length,
+            max_mel_length=None,
             duration_target=None,
             pitch_target=None,
             energy_target=None,
@@ -79,14 +85,18 @@ class VarianceAdaptor(nn.Module):
     ):
         # Duration
         log_duration = self.duration_predictor(src_seq)
-        
+
         if duration_target is not None:
+            output, mel_length = self.length_regulator(
+                src_seq, durations=None, target=duration_target, mel_max_length=max_mel_length
+            )
             duration = duration_target
         else:
             duration = torch.round((torch.exp(log_duration) - 1) * duration_coeff)
             duration[duration < 0] = 0.
-        
-        output, mel_length = self.length_regulator(src_seq, duration, max_mel_length)
+            output, mel_length = self.length_regulator(
+                src_seq, durations=duration, target=None, mel_max_length=None
+            )
         
         # Pitch
         pitch = self.pitch_predictor(output)
