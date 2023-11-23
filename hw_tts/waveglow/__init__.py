@@ -1,2 +1,2 @@
-import waveglow.inference
-import waveglow.mel2samp
+from .inference import *
+from .mel2samp import *

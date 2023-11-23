@@ -75,8 +75,8 @@ class FastSpeech2(nn.Module):
         return {
             "mel_predict": output,
             "log_duration_predict": adaptor_output["log_duration"],
-            "log_pitch_predict": adaptor_output["pitch"],
-            "log_energy_predict": adaptor_output["energy"],
+            "pitch_predict": adaptor_output["pitch"],
+            "energy_predict": adaptor_output["energy"],
             "mel_length_predict": adaptor_output["mel-length"]
         }
     
@@ -120,7 +120,9 @@ class FastSpeech2(nn.Module):
                 energy_coeff=energy_coeff
             )
         
-        mel_predict = output["mel_predict"].transpose(1, 2)
+        mel_predicts = output["mel_predict"].transpose(1, 2)
+
+        for ind, mel_predict
         desc = f"predicts for: duration = {duration_coeff}, "\
             f"pitch = {pitch_coeff}, energy = {energy_coeff}"
         waveglow_inference(mel_predict, WaveGlow, desc)

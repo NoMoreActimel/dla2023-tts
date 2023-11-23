@@ -1,8 +1,7 @@
 import torch
 
 from utils import get_WaveGlow
-import waveglow
-
+import hw_tts.waveglow as waveglow
 
 def run_inference(
         model,

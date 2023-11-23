@@ -13,7 +13,7 @@ from tqdm import tqdm
 from hw_tts.base import BaseTrainer
 from hw_tts.logger.utils import plot_spectrogram_to_buf
 from hw_tts.utils import inf_loop, MetricTracker
-from hw_tts.inference import run_inference
+from inference import run_inference
 
 
 class Trainer(BaseTrainer):
@@ -65,7 +65,10 @@ class Trainer(BaseTrainer):
             "train": [30, 40, 50],
             "val": [30, 40, 50]
         }
-        self.inference_path = config["data"]["inference_path"]
+        self.inference_paths = {
+            "train": config["data"]["train"]["inference_path"],
+            "val": config["data"]["val"]["inference_path"]
+        }
 
 
     @staticmethod
@@ -138,7 +141,7 @@ class Trainer(BaseTrainer):
                     last_lr = self.lr_scheduler.get_last_lr()[0]
 
                 self.writer.add_scalar("learning rate", last_lr)
-                self._log_spectrogram(batch["mel_predict"])
+                self._log_spectrogram(batch["mel_predict"].detach())
                 self._log_scalars(self.train_metrics)
                 # we don't want to reset train metrics at the start of every epoch
                 # because we are interested in recent train metrics
@@ -152,6 +155,7 @@ class Trainer(BaseTrainer):
                 model=self.model,
                 dataset=self.datasets[dataset_type],
                 dataset_type="train",
+                inference_path=self.inference_paths[dataset_type],
                 indices=self.inference_indices[dataset_type],
                 duration_coeffs=[1.0],
                 pitch_coeffs=[1.0],
