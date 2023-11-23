@@ -7,6 +7,7 @@
         "args": {
         }
       },
+      "load_dataset": false,
       "preprocess_wavs": false,
       "perform_preprocessing": false,
       "use_pitch_spectrogram": false,
@@ -48,7 +49,7 @@
         },
         "encoder_decoder": {
           "max_seq_len": 1000,
-          "vocab_size": 256,
+          "vocab_size": 400,
           "fft_conv1d_kernel": [9, 1],
           "fft_conv1d_padding": [4, 0],
           "encoder_layer": 4,

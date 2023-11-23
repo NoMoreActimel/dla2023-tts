@@ -82,7 +82,10 @@ class Trainer(BaseTrainer):
         """
         Move all necessary tensors to the HPU
         """
-        for tensor_for_gpu in ["input", "ref", "ref_length", "target", "audio_length", "speaker_id"]:
+        for tensor_for_gpu in [
+            "src_seq", "src_pos", "mel_target", "mel_pos", 
+            "duration_target", "pitch_target", "energy_target"
+        ]:
             batch[tensor_for_gpu] = batch[tensor_for_gpu].to(device)
         
         return batch
@@ -167,26 +170,17 @@ class Trainer(BaseTrainer):
             self, batch, is_train: bool, metrics_tracker: MetricTracker,
             rare_metrics_tracker: MetricTracker = None
             ):
+    
         batch = self.move_batch_to_device(batch, self.device)
         if is_train:
             self.optimizer.zero_grad()
-        outputs, speaker_logits = self.model(**batch)
-        batch["predicts"] = outputs
-        batch["speaker_logits"] = speaker_logits
-
-        speaker_predicts = torch.softmax(batch["speaker_logits"], dim=1).argmax(dim=1)
-        speaker_accuracy = (speaker_predicts == batch["speaker_id"]).sum() / speaker_predicts.shape[0]
-
-        # if type(outputs) is dict:
-        #     batch.update(outputs)
-        # else:
-        #     batch["logits"] = outputs
-
-        # batch["log_probs"] = F.log_softmax(batch["logits"], dim=-1)
-        # batch["log_probs_length"] = self.model.transform_input_lengths(
-        #     batch["spectrogram_length"]
-        # )
-        batch["loss"], batch["sisdr_loss"], batch["ce_loss"] = self.criterion(eval_mode=(not is_train), **batch)
+        outputs = self.model(**batch)
+        batch.update(outputs)
+        
+        losses = self.criterion(**batch)
+        loss_names = "loss", "mel_loss", "duration_loss", "pitch_loss", "energy_loss"
+        for i, loss_name in enumerate(loss_names):
+                batch[loss_name] = losses[i]
 
         if is_train:
             batch["loss"].backward()
@@ -195,11 +189,9 @@ class Trainer(BaseTrainer):
             if self.lr_scheduler is not None:
                 if not isinstance(self.lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                     self.lr_scheduler.step()
-
-        metrics_tracker.update("loss", batch["loss"].item())
-        metrics_tracker.update("sisdr_loss", batch["sisdr_loss"].item())
-        metrics_tracker.update("ce_loss", batch["ce_loss"].item())
-        metrics_tracker.update("speaker_accuracy", speaker_accuracy.item())
+        
+        for loss_name in loss_names:
+            metrics_tracker.update(loss_name, batch[loss_name].item())
 
         for met in self.metrics:
             metrics_tracker.update(met.name, met(**batch))

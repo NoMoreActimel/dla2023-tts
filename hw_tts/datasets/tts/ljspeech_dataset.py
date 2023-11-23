@@ -49,7 +49,8 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
         self.max_wav_value = self.config["preprocessing"]["max_wav_value"]
         self.sample_rate = self.config["preprocessing"]["sr"]
 
-        if len(os.listdir(self._raw_data_dir)) == 0:
+        if self.config["preprocessing"].get("load_dataset", True) and \
+                len(os.listdir(self._raw_data_dir)) == 0:
             self._load_dataset()
 
         self.data_processor = LJSpeechPreprocessor(self._raw_data_dir, self._data_dir, self.config)
@@ -85,14 +86,23 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
         pitch = np.load(self.pitch_dir / f"{name}_pitch.npy")
         energy = np.load(self.energy_dir / f"{name}_energy.npy")
 
+        text = torch.from_numpy(text).long()
+
+        spectrogram = torch.from_numpy(spectrogram).float()
+        spec_length = spectrogram.shape[0]
+
+        duration = torch.from_numpy(duration).long()
+        pitch = torch.from_numpy(pitch).float()[:spec_length]
+        energy = torch.from_numpy(energy).float().T.squeeze(-1)[:spec_length]
+
         return {
             "name": name,
             "raw_text": raw_text,
-            "text": torch.from_numpy(text).long(),
-            "spectrogram": torch.from_numpy(spectrogram).float(),
-            "duration": torch.from_numpy(duration).long(),
-            "pitch": torch.from_numpy(pitch).float(),
-            "energy": torch.from_numpy(energy).float()
+            "text": text,
+            "spectrogram": spectrogram,
+            "duration": duration,
+            "pitch": pitch,
+            "energy": energy
         }
 
     def _get_or_load_index(self):
@@ -122,13 +132,7 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
         
         return index
     
-    @classmethod
-    def collate_fn(batch_items):
-        batch = {
-            "name": [], "raw_text": [], "text": [], "text_length": [],
-            "spectrogram": [], "spectrogram_length": [],
-            "duration": [], "pitch": [], "energy": []
-        }
+    def collate_fn(self, batch_items):
         # src_seq,
         # src_pos,
         # mel_pos,
@@ -139,7 +143,7 @@ class LJspeechFastSpeech2Dataset(BaseDataset):
 
         batch = {}
         batch["src_seq"] = [item["text"] for item in batch_items]
-        batch_items["mel_target"] = [item["spectrogram"] for item in batch_items]
+        batch["mel_target"] = [item["spectrogram"] for item in batch_items]
         batch["duration_target"] = [item["duration"] for item in batch_items]
         batch["pitch_target"] = [item["pitch"] for item in batch_items]
         batch["energy_target"] = [item["energy"] for item in batch_items]

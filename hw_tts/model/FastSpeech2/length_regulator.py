@@ -47,30 +47,35 @@ class LengthRegulator(nn.Module):
         return output
 
     def forward(self, input, durations, mel_max_length=None):
-        output = []
+        if durations is not None:
+            return self.LR(input, durations, mel_max_length), durations
+        
+        output = self.LR(input, durations)
+        mel_pos = torch.arange(1, output.shape[1] + 1, dtype=torch.long).unsqueeze(0)
+        return output, mel_pos.to(output.device)
 
-        for sample, sample_durations in zip(input, durations):
-            expanded_sample = []
-            for embed, duration in zip(sample, sample_durations):
-                expanded_sample.append(embed.expand(
-                    max(int(duration), 0), -1
-                ))
-            output.append(torch.cat(expanded_sample, 0).to(input.device))
+        # for sample, sample_durations in zip(input, durations):
+        #     expanded_sample = []
+        #     for embed, duration in zip(sample, sample_durations):
+        #         expanded_sample.append(embed.expand(
+        #             max(int(duration), 0), -1
+        #         ))
+        #     output.append(torch.cat(expanded_sample, 0).to(input.device))
         
-        mel_lengths = torch.tensor(
-            [sample.shape[0] for sample in output]
-        ).long().to(input.device)
+        # mel_lengths = torch.tensor(
+        #     [sample.shape[0] for sample in output]
+        # ).long().to(input.device)
         
-        if mel_max_length is not None:
-            max_length = mel_max_length
-        else:
-            max_length = max(sample.shape[1] for sample in output)
+        # if mel_max_length is not None:
+        #     max_length = mel_max_length
+        # else:
+        #     max_length = max(sample.shape[1] for sample in output)
         
-        output = torch.stack([
-            F.pad(
-                sample, pad=(0, 0, 0, max_length - sample.shape[1]),
-                mode='constant', value=0.
-            ) for sample in output
-        ]).to(input.device)
+        # output = torch.stack([
+        #     F.pad(
+        #         sample, pad=(0, 0, 0, max_length - sample.shape[1]),
+        #         mode='constant', value=0.
+        #     ) for sample in output
+        # ]).to(input.device)
 
-        return output, mel_lengths
+        # return output, mel_lengths

@@ -152,7 +152,7 @@ class LJSpeechPreprocessor:
 
         print("Processing wavs and texts to get pitch and energy...")
 
-        STOP_MAX_ITER = 100
+        STOP_MAX_ITER = -1
 
         for i, wav_filename in enumerate(tqdm(os.listdir(self.raw_data_dir))):
             if i == STOP_MAX_ITER:
@@ -188,7 +188,7 @@ class LJSpeechPreprocessor:
             for pitch in pitches
         ]
 
-        energies = np.concatenate(energies, axis=1)
+        energies = [np.array(energy) for energy in energies]
         stats["energy"]["mean"] = float(np.mean([np.mean(energy) for energy in energies]))
         stats["energy"]["std"] = float(np.mean([np.std(energy) for energy in energies]))
         stats["energy"]["min"] = float(np.min([np.min(energy) for energy in energies]))
@@ -233,7 +233,7 @@ class LJSpeechPreprocessor:
 
         for name, pitch in zip(names, pitches):
             np.save(self.pitch_path / f"{name}_pitch.npy", pitch)
-        for name, energy in zip(name, energies):
+        for name, energy in zip(names, energies):
             np.save(self.energy_path / f"{name}_energy.npy", energy)
         
         train_data, val_data = train_test_split(

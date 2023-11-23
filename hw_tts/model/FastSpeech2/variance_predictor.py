@@ -38,6 +38,7 @@ class VariancePredictor(nn.Module):
             nn.Dropout(self.dropout)
         )
 
+        self.relu = nn.ReLU()
         self.linear_layer = nn.Linear(self.conv_output_size, 1)
 
     def forward(self, encoder_output):

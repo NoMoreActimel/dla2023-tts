@@ -34,6 +34,7 @@ class VarianceAdaptor(nn.Module):
         self.quantization_log_scaling = self.adaptor_config["quantization_log_scaling"]
         
         for feature in ["pitch", "energy"]:
+            # bad vibes, I was a clown..
             setattr(
                 self, f"{feature}_embedding",
                 nn.Embedding(self.num_bins, model_config["encoder_decoder"]["encoder_dim"])
@@ -49,7 +50,7 @@ class VarianceAdaptor(nn.Module):
 
             if self.quantization_log_scaling:
                 feature_scale = torch.exp(torch.linspace(
-                    torch.log(feature_min), torch.log(feature_max), self.num_bins
+                    torch.log(1 + feature_min), torch.log(1 + feature_max), self.num_bins
                 ))
             else:
                 feature_scale = torch.linspace(
@@ -73,14 +74,15 @@ class VarianceAdaptor(nn.Module):
             energy_coeff=1.0
     ):
         # Duration
-        duration = self.duration_predictor(src_seq)
+        log_duration = self.duration_predictor(src_seq)
         
         if duration_target is not None:
-            output, mel_length = self.length_regulator(src_seq, duration, max_mel_length)
             duration = duration_target
         else:
-            duration = torch.round((torch.exp(duration) - 1) * duration_coeff)
+            duration = torch.round((torch.exp(log_duration) - 1) * duration_coeff)
             duration[duration < 0] = 0.
+        
+        output, mel_length = self.length_regulator(src_seq, duration, max_mel_length)
         
         # Pitch
         pitch = self.pitch_predictor(output)
@@ -108,7 +110,8 @@ class VarianceAdaptor(nn.Module):
 
         return {
             "mel-spectrogram": output,
-            "duration": duration,
+            "duration_true": duration,
+            "log_duration": log_duration,
             "pitch": pitch,
             "energy": energy,
             "mel-length": mel_length
