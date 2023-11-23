@@ -148,7 +148,7 @@ class Trainer(BaseTrainer):
                     last_lr = self.lr_scheduler.get_last_lr()[0]
 
                 self.writer.add_scalar("learning rate", last_lr)
-                self._log_spectrogram(batch["mel_predict"].detach())
+                self._log_spectrogram(batch["mel_predict"].detach().transpose(1, 2))
                 self._log_scalars(self.train_metrics)
                 # we don't want to reset train metrics at the start of every epoch
                 # because we are interested in recent train metrics

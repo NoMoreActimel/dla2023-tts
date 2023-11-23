@@ -258,7 +258,7 @@ class LJSpeechPreprocessor:
                     "Error during wav and text processing: {wav_path} does not exist"
 
                 wav, _ = librosa.load(wav_path, sr=self.sample_rate)
-                wav *= np.abs(wav).max() / self.max_wav_value
+                wav = wav / np.abs(wav).max() * self.max_wav_value
                 wavfile.write(
                     self.raw_data_dir / f'{name}.wav',
                     self.sample_rate,
