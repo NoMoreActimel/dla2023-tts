@@ -84,7 +84,7 @@ class FastSpeech2(nn.Module):
         if mel_pos is None:
             return None
 
-        length = torch.max(mel_pos, dim=-1)
+        length = torch.max(mel_pos, dim=-1)[0]
         if max_mel_length is None:
             max_mel_length = torch.max(length).item()
         
@@ -92,37 +92,3 @@ class FastSpeech2(nn.Module):
         mask = (ids >= mel_pos).bool().unsqueeze(-1)
 
         return mask
-        
-
-    def inference(
-            self,
-            src_seq,
-            src_pos,
-            duration_coeff=1.0,
-            pitch_coeff=1.0,
-            energy_coeff=1.0,
-            WaveGlow=None,
-            waveglow_inference=None):
-    
-        if WaveGlow is not None:
-            if self.WaveGlow is None:
-                self.WaveGlow = WaveGlow
-        else:
-            assert self.WaveGlow is not None, f"No WaveGlow object provided for inference"
-            WaveGlow = self.WaveGlow
-        
-        with torch.no_grad():
-            output = self.forward(
-                src_seq,
-                src_pos,
-                duration_coeff=duration_coeff,
-                pitch_coeff=pitch_coeff,
-                energy_coeff=energy_coeff
-            )
-        
-        mel_predicts = output["mel_predict"].transpose(1, 2)
-
-        for ind, mel_predict
-        desc = f"predicts for: duration = {duration_coeff}, "\
-            f"pitch = {pitch_coeff}, energy = {energy_coeff}"
-        waveglow_inference(mel_predict, WaveGlow, desc)

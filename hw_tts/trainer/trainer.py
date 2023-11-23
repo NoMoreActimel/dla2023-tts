@@ -168,7 +168,8 @@ class Trainer(BaseTrainer):
                     indices=self.inference_indices[dataset_type],
                     duration_coeffs=[1.0],
                     pitch_coeffs=[1.0],
-                    energy_coeffs=[1.0]
+                    energy_coeffs=[1.0],
+                    epoch=epoch
                 )
 
         log = last_train_metrics

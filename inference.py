@@ -1,5 +1,7 @@
 import torch
 
+from pathlib import Path
+
 from utils import get_WaveGlow
 import hw_tts.waveglow as waveglow
 
@@ -27,7 +29,11 @@ def run_inference(
         duration_coeffs=[1.0],
         pitch_coeffs=[1.0],
         energy_coeffs=[1.0],
+        epoch=None
     ):
+    path = Path(inference_path)
+    path.mkdir(exist_ok=True, parents=True)
+
     WaveGlow = get_WaveGlow(waveglow_path)
 
     batch = dataset.collate_fn([dataset[ind] for ind in indices])
@@ -49,7 +55,7 @@ def run_inference(
 
                 for ind, mel_predict in zip(indices, mel_predicts):
                     path = inference_path + \
-                        f"{dataset_type}_utterance_{ind}:_" \
+                        f"/{dataset_type}_epoch{epoch}_utterance_{ind}:_" \
                         f"duration={duration_coeff}_pitch={pitch_coeff}_" \
-                        f"energy={energy_coeff}"
-                    waveglow.inference.inference(mel_predict, WaveGlow, path)
+                        f"energy={energy_coeff}.wav"
+                    waveglow.inference(mel_predict.unsqueeze(0), WaveGlow, path)
