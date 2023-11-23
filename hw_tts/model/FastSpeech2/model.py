@@ -62,6 +62,8 @@ class FastSpeech2(nn.Module):
         )
 
         output = adaptor_output["mel-spectrogram"]
+        if mel_pos is None:
+            mel_pos = adaptor_output["mel-length"]
         output = self.decoder(output, mel_pos)
 
         mel_mask = self.get_mel_mask(output, mel_pos, max_mel_length)
