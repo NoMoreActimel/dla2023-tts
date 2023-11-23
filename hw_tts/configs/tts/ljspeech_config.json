@@ -43,9 +43,19 @@
         "data_dir": "/content/dla2023-tts/data/datasets/ljspeech/data",
         "variance_adaptor": {
           "num_bins": 256,
-          "quantization_log_scaling": true,
+          "quantization_log_scaling": false,
           "pitch_quantization": true,
-          "energy_quantization": true
+          "energy_quantization": true,
+          "pitch_energy_stats": {
+            "pitch": {
+              "min": -2.9029153696148327,
+              "max": 12.872838334471972
+            },
+            "energy": {
+              "min": -1.1383792129971702,
+              "max": 25.36056593542059
+            }
+          }
         },
         "encoder_decoder": {
           "max_seq_len": 1000,

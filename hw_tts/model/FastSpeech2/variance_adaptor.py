@@ -15,6 +15,7 @@ class VarianceAdaptor(nn.Module):
         super().__init__()
 
         self.model_config = model_config
+        self.adaptor_config = model_config["variance_adaptor"]
 
         self.duration_predictor = VariancePredictor(model_config)
         self.pitch_predictor = VariancePredictor(model_config)
@@ -24,12 +25,15 @@ class VarianceAdaptor(nn.Module):
 
         data_dir = Path(model_config["data_dir"])
 
-        with open(data_dir / "pitch_energy_stats.json", "r") as f:
-            pitch_energy_stats = json.load(f)
-            self.pitch_stats = pitch_energy_stats["pitch"]
-            self.energy_stats = pitch_energy_stats["energy"]
+        pitch_energy_stats = self.adaptor_config.get("pitch_energy_stats", None)
         
-        self.adaptor_config = model_config["variance_adaptor"]
+        if pitch_energy_stats is None:
+            with open(data_dir / "pitch_energy_stats.json", "r") as f:
+                pitch_energy_stats = json.load(f)
+
+        self.pitch_stats = pitch_energy_stats["pitch"]
+        self.energy_stats = pitch_energy_stats["energy"]
+        
         self.num_bins = self.adaptor_config["num_bins"]
         self.quantization_log_scaling = self.adaptor_config["quantization_log_scaling"]
         

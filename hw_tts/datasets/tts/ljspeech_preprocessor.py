@@ -177,26 +177,25 @@ class LJSpeechPreprocessor:
         stats = {"pitch": {}, "energy": {}}
 
         # normalize and quantize pitches and energies
-        # pitch log scaling is already applied in self.get_pitch_f0
         pitches = [np.array(pitch) for pitch in pitches]
         stats["pitch"]["mean"] = float(np.mean([np.mean(pitch) for pitch in pitches]))
         stats["pitch"]["std"] = float(np.mean([np.std(pitch) for pitch in pitches]))
-        stats["pitch"]["min"] = float(np.min([np.min(pitch) for pitch in pitches]))
-        stats["pitch"]["max"] = float(np.max([np.max(pitch) for pitch in pitches]))
         pitches = [
             (pitch - stats["pitch"]["mean"]) / stats["pitch"]["std"]
             for pitch in pitches
         ]
+        stats["pitch"]["min"] = float(np.min([np.min(pitch) for pitch in pitches]))
+        stats["pitch"]["max"] = float(np.max([np.max(pitch) for pitch in pitches]))
 
         energies = [np.array(energy) for energy in energies]
         stats["energy"]["mean"] = float(np.mean([np.mean(energy) for energy in energies]))
         stats["energy"]["std"] = float(np.mean([np.std(energy) for energy in energies]))
-        stats["energy"]["min"] = float(np.min([np.min(energy) for energy in energies]))
-        stats["energy"]["max"] = float(np.max([np.max(energy) for energy in energies]))
         energies = [
             (energy - stats["energy"]["mean"]) / stats["energy"]["std"]
             for energy in energies
         ]
+        stats["energy"]["min"] = float(np.min([np.min(energy) for energy in energies]))
+        stats["energy"]["max"] = float(np.max([np.max(energy) for energy in energies]))
 
         """
         We will apply Continuous Wavelet Transform to normalized f0 contours,
@@ -386,9 +385,6 @@ class LJSpeechPreprocessor:
             kind="linear"
         )
         pitch_f0 = interp_fn(np.arange(pitch_f0.shape[0]))
-
-        if not self.pitch_energy_normalization:
-            pitch_f0 = np.log(pitch_f0)
 
         return pitch_f0
         

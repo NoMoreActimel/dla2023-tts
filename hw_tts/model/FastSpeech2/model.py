@@ -81,16 +81,17 @@ class FastSpeech2(nn.Module):
             "mel_length_predict": adaptor_output["mel-length"]
         }
     
-    def get_mel_mask(self, output, mel_pos, max_mel_length):
+    def get_mel_mask(self, mel, mel_pos, max_mel_length):
         if mel_pos is None:
             return None
 
+        length = torch.max(mel_pos, dim=-1)
         if max_mel_length is None:
-            max_mel_length = torch.max(mel_pos).item()
+            max_mel_length = torch.max(length).item()
         
-        ids = torch.arange(0, max_mel_length).unsqueeze(0)
-        ids = ids.expand(mel_pos.shape[0], -1).to(output.device)
-        mask = ids >= mel_pos.unsqueeze(1).expand(-1, max_mel_length)
+        ids = torch.arange(0, max_mel_length).unsqueeze(0).to(mel.device)
+        mask = (ids >= mel_pos).bool().unsqueeze(-1)
+
         return mask
         
 
