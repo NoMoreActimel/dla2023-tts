@@ -118,7 +118,7 @@
       }
     },
     "loss": {
-      "type": "SpExPlusLoss",
+      "type": "FastSpeech2Loss",
       "args": {}
     },
     "metrics": [
