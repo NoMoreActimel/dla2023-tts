@@ -25,7 +25,7 @@ np.random.seed(SEED)
 
 def main(config):
     logger = config.get_logger("train")
-    
+
     # setup data_loader instances
     dataloaders = get_dataloaders(config)
 
@@ -42,7 +42,7 @@ def main(config):
     # get function handles of loss and metrics
     loss_module = config.init_obj(config["loss"], module_loss).to(device)
     metrics = [
-        config.init_obj(metric_dict, module_metric, text_encoder=text_encoder)
+        config.init_obj(metric_dict, module_metric, text_encoder=None)
         for metric_dict in config["metrics"]
     ]
 
@@ -57,7 +57,6 @@ def main(config):
         loss_module,
         metrics,
         optimizer,
-        text_encoder=text_encoder,
         config=config,
         device=device,
         dataloaders=dataloaders,
