@@ -54,8 +54,6 @@ def run_inference(
         for pitch_coeff in pitch_coeffs:
             for energy_coeff in energy_coeffs:
                 with torch.no_grad():
-                    print(batch["src_seq"].shape)
-                    print(batch["src_pos"].shape)
                     output = model.forward(**{
                         "src_seq": batch["src_seq"],
                         "src_pos": batch["src_pos"],
